@@ -1,0 +1,28 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.1">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Dashboard and orchestrator come from NuGet, so a plain `dotnet run` of this project works without the
+         Aspire CLI installed; ASPIRE010 only notes that the CLI bundle is not used. -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+    <UserSecretsId>cc2f1e42-1765-40d8-9860-2d0ada78c563</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.MailPit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Used by the ClamAV health check in AppHost.cs. Declared here rather than as using directives, so an
+         editor's "remove unnecessary usings" cleanup cannot strip them and break the build. -->
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Api\ApiService\ApiService.csproj" />
+  </ItemGroup>
+
+</Project>

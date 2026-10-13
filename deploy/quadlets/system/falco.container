@@ -1,0 +1,22 @@
+# Falco (ADR-011): the one rootful, privileged container, because the modern eBPF probe needs kernel access.
+# Detections and a 15-minute metrics snapshot (the heartbeat, observability-architecture.md §8.4) go to stdout as
+# JSON, i.e. to the journal.
+[Unit]
+Description=Falco runtime security
+
+[Container]
+ContainerName=healthyhires-falco
+Image=docker.io/falcosecurity/falco:0.45.0@sha256:788f1129c542171813083d4afc61b16730a47dde8c23d9c39370acef996349b6
+PodmanArgs=--privileged
+Volume=/proc:/host/proc:ro
+Volume=/etc:/host/etc:ro
+Volume=/run/podman:/host/run/podman:ro
+Volume=/run/user:/host/run/user:ro
+Volume=/etc/healthyhires/falco:/etc/falco/rules.d:ro
+Exec=falco -o engine.kind=modern_ebpf -o json_output=true -o metrics.enabled=true -o metrics.interval=15m -o metrics.output_rule=true
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+# The ASP.NET API on localhost:8080 inside the pod, never published (container-deployment.md §1.3).
+[Unit]
+Description=HealthyHires API
+
+[Container]
+ContainerName=healthyhires-api
+Image=@API_IMAGE@
+Pod=healthyhires.pod
+EnvironmentFile=/etc/healthyhires/api.env
+ReadOnly=true
+Tmpfs=/tmp
+NoNewPrivileges=true
+DropCapability=ALL
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

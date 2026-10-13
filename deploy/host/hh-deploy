@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# Installs a HealthyHires release on the VM (container-deployment.md §3.3). Runs as root through sudo from the
+# deploy user's forced SSH command:
+#
+#   deploy     read a release bundle (tar.gz, built by deploy/render-bundle.sh) from stdin, verify it, install it
+#   rollback   reinstall the previous release
+#
+# Verification: every image is pinned by digest, and every image from this repository's GitHub Container
+# Registry namespace must carry a Cosign signature from its deploy workflow on main. The repository comes from
+# /etc/healthyhires/deploy.conf, written at provisioning, never from the bundle.
+set -euo pipefail
+umask 027
+
+readonly releases=/var/lib/healthyhires/releases
+readonly cosign_image='ghcr.io/sigstore/cosign/cosign:v2.6.1@sha256:68839b7f13dac5a6744a5d8818e984dd39183374e37855c19e14d623d9bc9037'
+readonly max_bundle_bytes=$((10 * 1024 * 1024))
+
+log() { echo "hh-deploy: $*" >&2; }
+die() { log "$*"; exit 1; }
+
+# shellcheck source=/dev/null
+source /etc/healthyhires/deploy.conf
+[[ -n "${HH_GITHUB_REPOSITORY:-}" ]] || die "HH_GITHUB_REPOSITORY is not set in /etc/healthyhires/deploy.conf"
+
+uid=$(id -u healthyhires)
+user_units="/etc/containers/systemd/users/$uid"
+own_registry="ghcr.io/${HH_GITHUB_REPOSITORY%%/*}"
+own_registry="${own_registry,,}/"
+signer="https://github.com/${HH_GITHUB_REPOSITORY}/.github/workflows/deploy.yml@refs/heads/main"
+
+user_systemctl() { systemctl --user -M healthyhires@ "$@"; }
+
+verify_release() {
+    local dir=$1 line image
+    local -a images=()
+    while IFS= read -r line; do
+        images+=("${line#Image=}")
+    done < <(grep -h '^Image=' "$dir"/quadlets/user/*.container "$dir"/quadlets/system/*.container)
+    (( ${#images[@]} > 0 )) || die "the bundle contains no images"
+
+    for image in "${images[@]}"; do
+        [[ $image == *@sha256:* ]] || die "image not pinned by digest: $image"
+        if [[ ${image,,} == "$own_registry"* ]]; then
+            log "verifying signature of $image"
+            podman run --rm "$cosign_image" verify \
+                --certificate-identity "$signer" \
+                --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+                "$image" > /dev/null || die "signature verification failed: $image"
+        fi
+    done
+}
+
+install_release() {
+    local dir=$1
+
+    install -m 0640 -o root -g healthyhires "$dir"/env/api.env "$dir"/env/caddy.env "$dir"/env/host.env /etc/healthyhires/
+    install -m 0640 -o root -g healthyhires "$dir"/otelcol/config.yaml /etc/healthyhires/otelcol/config.yaml
+    rm -f /etc/healthyhires/falco/*.yaml
+    install -m 0644 -o root -g root "$dir"/falco/*.yaml /etc/healthyhires/falco/
+
+    # Rootless units for the healthyhires user, replaced as a set so a removed unit does not linger.
+    install -d -m 0755 "$user_units"
+    rm -f "$user_units"/*.pod "$user_units"/*.container "$user_units"/*.volume
+    install -m 0644 "$dir"/quadlets/user/* "$user_units"/
+    install -m 0644 "$dir"/quadlets/system/falco.container /etc/containers/systemd/falco.container
+
+    systemctl daemon-reload
+    systemctl restart falco.service
+    user_systemctl daemon-reload
+    # Restarting the pod restarts every container in it; a short interruption is accepted (ADR-002).
+    user_systemctl restart healthyhires-pod.service
+}
+
+check_running() {
+    local unit failed=0
+    sleep 15
+    for unit in caddy api otelcol clamav; do
+        if ! user_systemctl is-active --quiet "$unit.service"; then
+            log "$unit.service is not active"
+            failed=1
+        fi
+    done
+    systemctl is-active --quiet falco.service || { log "falco.service is not active"; failed=1; }
+    return "$failed"
+}
+
+deploy() {
+    local bundle name id
+    tmp=$(mktemp -d)
+    trap 'rm -rf "${tmp:-}"' EXIT
+    bundle="$tmp/bundle.tgz"
+
+    head -c "$((max_bundle_bytes + 1))" > "$bundle"
+    (( $(stat -c %s "$bundle") <= max_bundle_bytes )) || die "bundle larger than $max_bundle_bytes bytes"
+
+    # Refuse anything that could land outside the extraction directory.
+    while IFS= read -r name; do
+        [[ $name =~ ^[A-Za-z0-9._/-]+$ && $name != /* && $name != *..* ]] || die "unexpected path in bundle: $name"
+    done < <(tar -tzf "$bundle")
+    mkdir "$tmp/release"
+    tar -xzf "$bundle" -C "$tmp/release" --no-same-owner --no-same-permissions
+
+    # shellcheck source=/dev/null
+    id=$(source "$tmp/release/release.env" && echo "${RELEASE_ID:-}")
+    [[ $id =~ ^[A-Za-z0-9._-]+$ ]] || die "release.env has no valid RELEASE_ID"
+
+    verify_release "$tmp/release"
+
+    local target
+    target="$releases/$(date -u +%Y%m%dT%H%M%SZ)-$id"
+    mv "$tmp/release" "$target"
+    if [[ -L $releases/current ]]; then
+        ln -sfn "$(readlink "$releases/current")" "$releases/previous"
+    fi
+    ln -sfn "$target" "$releases/current"
+
+    install_release "$target"
+    # Keep the five most recent releases.
+    find "$releases" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | head -n -5 \
+        | while IFS= read -r name; do rm -rf "${releases:?}/$name"; done
+
+    check_running || die "release $id installed, but not every service is running"
+    log "release $id is running"
+}
+
+rollback() {
+    [[ -L $releases/previous ]] || die "no previous release to roll back to"
+    local previous current
+    previous=$(readlink "$releases/previous")
+    current=$(readlink "$releases/current")
+    ln -sfn "$previous" "$releases/current"
+    ln -sfn "$current" "$releases/previous"
+    install_release "$previous"
+    check_running || die "rolled back to $(basename "$previous"), but not every service is running"
+    log "rolled back to $(basename "$previous")"
+}
+
+case "${1:-}" in
+    deploy) deploy ;;
+    rollback) rollback ;;
+    *) die "usage: hh-deploy deploy|rollback" ;;
+esac

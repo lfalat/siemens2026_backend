@@ -1,0 +1,26 @@
+# HealthyHires edge for local testing: the production routes, headers and CSP in front of a locally running API
+# and the built frontend (App/dist). The routes and headers live in configs_production/site.caddy, the file
+# Caddyfile.production imports, so ZAP, Playwright and k6 run against the same edge that is deployed (ADR-020,
+# ADR-019, ADR-018). It is mounted next to this file in the container, which is why the import below has no path.
+#
+# Not part of everyday development — the frontend runs on the Vite dev server, which proxies /api itself — and
+# not part of the AppHost. Start it on demand with host networking, so it reaches the API on localhost exactly
+# as Caddy does inside the pod; see development-architecture.md §3.3 for the command.
+#
+# What differs from production: plain HTTP on :8088, no ACME and no metrics endpoint. Set when starting it:
+#
+#   API_UPSTREAM    the API, e.g. localhost:5180
+#   BLOB_ENDPOINT   Azurite's blob endpoint, e.g. http://localhost:10000
+#
+# ENTRA_TENANT_ID, ENTRA_CLIENT_ID and API_SCOPE are empty unless set; /config.json then serves empty strings.
+{
+	admin off
+	auto_https off
+}
+
+import site.caddy
+
+:8088 {
+	import healthyhires_site
+	import access_log
+}

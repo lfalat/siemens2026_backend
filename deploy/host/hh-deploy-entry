@@ -1,0 +1,4 @@
+#!/bin/sh
+# Forced command of the deploy user's SSH key (infra/cloud-init.yaml). sudo resets the environment, so the
+# requested action is passed on as an argument; hh-deploy accepts only "deploy" and "rollback".
+exec sudo /usr/local/sbin/hh-deploy "${SSH_ORIGINAL_COMMAND:-deploy}"

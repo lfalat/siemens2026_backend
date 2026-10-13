@@ -1,0 +1,30 @@
+@startuml includes
+!NEW_C4_STYLE = 1
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+!$COMPONENT_FONT_COLOR ?= "#4bdaf0ff"
+!$COMPONENT_BORDER_COLOR ?= "#1303f8ff"
+!$COMPONENT_BG_COLOR = "#ffffffff"
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+!define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons
+!define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+!define CLOUDICONS https://raw.githubusercontent.com/cloudogu/plantuml-cloudogu-sprites/master/tools
+!define CLOUDICONSP https://raw.githubusercontent.com/plantuml/plantuml-stdlib/master/stdlib/cloudinsight
+AddRelTag("gitops",      $textColor="#8A2BE2", $lineColor="#8A2BE2")
+AddRelTag("pubsub",      $textColor="#2E8B57", $lineColor="#2E8B57", $lineStyle="bold")
+AddRelTag("pubsubAbst",  $textColor="#2E8B57", $lineColor="#2E8B57", $lineStyle="dashed")
+AddRelTag("graph",       $textColor="#1E90FF", $lineColor="#1E90FF")
+AddRelTag("networking",  $textColor="#4169E1", $lineColor="#4169E1")
+AddRelTag("monitoring",  $textColor="#FF8C00", $lineColor="#FF8C00")
+AddRelTag("viz",         $textColor="#CD853F", $lineColor="#CD853F")
+AddRelTag("secrets",     $textColor="#DC143C", $lineColor="#DC143C")
+AddRelTag("terraform",   $textColor="#7B42BC", $lineColor="#7B42BC", $lineStyle="dotted")
+AddRelTag("cloud_net",   $textColor="#FF6B6B", $lineColor="#FF6B6B", $lineStyle="dashed")
+AddRelTag("storage",     $textColor="#2F4F4F", $lineColor="#2F4F4F")
+AddRelTag("payment",     $textColor="#DAA520", $lineColor="#DAA520")
+AddRelTag("auth",        $textColor="#6A5ACD", $lineColor="#6A5ACD")
+AddRelTag("email",       $textColor="#E9967A", $lineColor="#E9967A")
+AddRelTag("ai",          $textColor="#008B8B", $lineColor="#008B8B")
+@enduml

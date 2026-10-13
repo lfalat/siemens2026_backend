@@ -1,0 +1,38 @@
+@startuml C1_System_Context
+!define LOCAL .
+!include LOCAL/include.plantuml
+
+!include FONTAWESOME/users.puml
+!include FONTAWESOME/user_tie.puml
+!include FONTAWESOME/shield_alt.puml
+!include FONTAWESOME/lock.puml
+!include FONTAWESOME/virus.puml
+
+LAYOUT_WITH_LEGEND()
+LAYOUT_LEFT_RIGHT()
+
+title C1 System Context Diagram — HealthyHires
+
+' Actors
+Person(applicant, "Applicant", "Anonymous member of the public. Browses job listings and applies with a CV and cover letter.", $sprite="users")
+Person(staff, "Staff", "HR worker, admin or owner. Signs in with a company work account.", $sprite="user_tie")
+
+' The system
+System(healthyhires, "HealthyHires", "Talent acquisition web application running on Azure: one VM (Caddy, ASP.NET modular monolith, OTel Collector, Falco, ClamAV), managed PostgreSQL, Blob Storage, Key Vault, Azure Monitor, ACS Email and Azure OpenAI (CV scoring, Sweden Central).")
+
+' External systems
+System_Ext(entra, "Microsoft Entra ID", "Company Microsoft 365 tenant. OIDC sign-in, MFA, app roles.", $sprite="lock")
+System_Ext(letsencrypt, "Let's Encrypt", "ACME certificate authority used by Caddy.", $sprite="shield_alt")
+System_Ext(clamav_mirror, "ClamAV signature mirror", "Virus signature updates for freshclam.", $sprite="virus")
+
+' Interactions
+Rel(applicant, healthyhires, "Browses job offers, uploads CV and cover letter", "HTTPS, browser")
+Rel(staff, healthyhires, "Manages job offers and reviews applications", "HTTPS, browser")
+Rel(staff, entra, "Signs in with work account + MFA", "HTTPS")
+Rel(healthyhires, entra, "Validates tokens, reads app roles", "OIDC")
+Rel(healthyhires, letsencrypt, "Obtains and renews TLS certificates", "ACME HTTP-01 / TLS-ALPN-01")
+Rel(healthyhires, clamav_mirror, "Downloads virus signatures", "HTTPS, outbound only")
+Rel(healthyhires, staff, "Sends notification emails", "SMTP via ACS Email")
+
+SHOW_LEGEND()
+@enduml

@@ -1,0 +1,44 @@
+# HealthyHires additions to Falco's default rules (ADR-011, container-deployment.md §1.6). Loaded from
+# /etc/falco/rules.d. Container names come from the Quadlet files in deploy/quadlets; whether Falco resolves the
+# names of rootless containers is still to be verified on the VM (container-deployment.md §5).
+
+- list: healthyhires_imds_allowed_containers
+  items: [healthyhires-api]
+
+- rule: HealthyHires IMDS access from an unexpected container
+  desc: >
+    Only the API asks the Instance Metadata Service for managed-identity tokens. Any other container doing so
+    can use every permission of the VM's identity (iam.md §4.3).
+  condition: >
+    evt.type = connect and fd.sip = "169.254.169.254"
+    and container.id != host
+    and not container.name in (healthyhires_imds_allowed_containers)
+  output: >
+    IMDS connection from container %container.name (proc=%proc.name cmdline=%proc.cmdline image=%container.image.repository)
+  priority: WARNING
+  tags: [healthyhires, imds, credential_access]
+
+- rule: HealthyHires unexpected process in the API container
+  desc: >
+    The API image is chiseled and has no shell; any process other than the API itself means something was
+    injected.
+  condition: >
+    spawned_process and container.name = "healthyhires-api" and not proc.name in (ApiService, dotnet)
+  output: >
+    Unexpected process in the API container (proc=%proc.name cmdline=%proc.cmdline parent=%proc.pname)
+  priority: WARNING
+  tags: [healthyhires, process]
+
+- rule: HealthyHires ClamAV egress other than signature updates
+  desc: >
+    ClamAV's only allowed egress is HTTPS from freshclam (ADR-011). Its mirror is a CDN with changing addresses,
+    so the rule matches on process and port rather than destination.
+  condition: >
+    evt.type = connect and fd.typechar = 4 and fd.ip != "0.0.0.0"
+    and container.name = "healthyhires-clamav"
+    and not fd.snet in ("127.0.0.0/8")
+    and not (proc.name = freshclam and fd.sport = 443)
+  output: >
+    Unexpected connection from ClamAV (proc=%proc.name connection=%fd.name)
+  priority: WARNING
+  tags: [healthyhires, network]

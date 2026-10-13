@@ -1,0 +1,219 @@
+#cloud-config
+# HealthyHires VM, first boot (container-deployment.md §3.1, infrastructure-operations-architecture.md §4.1).
+# infra/modules/vm.bicep replaces the __PLACEHOLDERS__ and embeds the scripts from deploy/host. Azure does not
+# allow custom data to change on an existing VM, so an edit here takes effect only on a rebuilt VM.
+#
+# What this does NOT do, on purpose: enrol NetBird (its setup key must not sit in custom data — see
+# scripts/azure/enrol-netbird.sh), start any application container (that is the first CI deploy), or initialise
+# the AIDE baseline (after the first deploy, guide §9.3).
+
+users:
+  - default
+  # Owns the rootless application pod (ADR-002). No login shell, no password, no SSH key.
+  - name: healthyhires
+    shell: /sbin/nologin
+    lock_passwd: true
+    groups: [adm, systemd-journal]
+  # Break-glass login for Azure Serial Console when NetBird or networking is broken (iam.md §7). Locked until
+  # scripts/azure/provision.sh breakglass sets a password whose only copy is in Key Vault; never allowed over SSH.
+  - name: breakglass
+    shell: /bin/bash
+    lock_passwd: true
+    groups: [wheel]
+  # CI's deploy user: its key runs exactly one command (iam.md §6). `restrict` disables forwarding and PTYs.
+  - name: deploy
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - 'restrict,command="/usr/local/bin/hh-deploy-entry" __DEPLOY_SSH_PUBLIC_KEY__'
+
+yum_repos:
+  netbird:
+    name: NetBird
+    baseurl: https://pkgs.netbird.io/yum/
+    enabled: true
+    gpgcheck: false
+    repo_gpgcheck: true
+    gpgkey: https://pkgs.netbird.io/yum/repodata/repomd.xml.key
+
+package_update: true
+packages:
+  - podman
+  - jq
+  - firewalld
+  - chrony
+  - audit
+  - aide
+  - openscap-scanner
+  - scap-security-guide
+  - dnf-automatic
+  - logrotate
+  - netbird
+
+write_files:
+  # Rootless Caddy publishes ports 80 and 443 (ADR-002).
+  - path: /etc/sysctl.d/90-healthyhires.conf
+    content: |
+      net.ipv4.ip_unprivileged_port_start = 80
+
+  # Which repository's signed images hh-deploy accepts. Set here, not by the deploy bundle, so a stolen deploy
+  # key cannot change it.
+  - path: /etc/healthyhires/deploy.conf
+    permissions: '0644'
+    content: |
+      HH_GITHUB_REPOSITORY=__GITHUB_REPOSITORY__
+
+  - path: /etc/sudoers.d/healthyhires-deploy
+    permissions: '0440'
+    content: |
+      deploy ALL=(root) NOPASSWD: /usr/local/sbin/hh-deploy deploy, /usr/local/sbin/hh-deploy rollback
+
+  # CIS audit rules with the ADR-017 deviations (deploy/host/audit-cis.rules). 99-finalize makes them immutable.
+  - path: /etc/audit/rules.d/50-healthyhires-cis.rules
+    permissions: '0640'
+    encoding: b64
+    content: __HH_AUDIT_RULES_B64__
+  - path: /etc/audit/rules.d/99-finalize.rules
+    permissions: '0640'
+    content: |
+      -e 2
+
+  - path: /etc/ssh/sshd_config.d/50-healthyhires.conf
+    permissions: '0600'
+    content: |
+      PasswordAuthentication no
+      DenyUsers breakglass
+
+  # CIS: sudo keeps its own log, which the audit rules watch.
+  - path: /etc/sudoers.d/00-healthyhires-logfile
+    permissions: '0440'
+    content: |
+      Defaults logfile=/var/log/sudo.log
+
+  - path: /usr/local/sbin/hh-deploy
+    permissions: '0750'
+    encoding: b64
+    content: __HH_DEPLOY_B64__
+  - path: /usr/local/bin/hh-deploy-entry
+    permissions: '0755'
+    encoding: b64
+    content: __HH_DEPLOY_ENTRY_B64__
+  - path: /usr/local/bin/hh-podman-secret
+    permissions: '0755'
+    encoding: b64
+    content: __HH_PODMAN_SECRET_B64__
+  - path: /usr/local/sbin/hh-report-openscap
+    permissions: '0750'
+    encoding: b64
+    content: __HH_REPORT_OPENSCAP_B64__
+  - path: /usr/local/sbin/hh-report-aide
+    permissions: '0750'
+    encoding: b64
+    content: __HH_REPORT_AIDE_B64__
+
+  # The Collector image has no journalctl, so its journald receiver cannot run in the container. The journal is
+  # exported as JSON lines instead and read with filelog (observability-architecture.md §2.1).
+  - path: /etc/systemd/system/hh-journal-export.service
+    content: |
+      [Unit]
+      Description=Export the journal as JSON lines for the OpenTelemetry Collector
+      After=systemd-journald.service
+
+      [Service]
+      UMask=0027
+      ExecStart=/bin/sh -c 'exec journalctl --follow --output=json --since=now >> /var/log/healthyhires/journal/journal.json'
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/logrotate.d/healthyhires
+    content: |
+      /var/log/healthyhires/journal/journal.json /var/log/healthyhires/reports/reports.log {
+          daily
+          rotate 2
+          missingok
+          notifempty
+          copytruncate
+      }
+
+  # Daily, so a missing report is noticed within the 2-day alert window (observability-architecture.md §8.4).
+  - path: /etc/systemd/system/hh-openscap.service
+    content: |
+      [Unit]
+      Description=OpenSCAP CIS Level 1 Server scan (audit only, ADR-008)
+
+      [Service]
+      Type=oneshot
+      Nice=10
+      ExecStart=/usr/local/sbin/hh-report-openscap
+  - path: /etc/systemd/system/hh-openscap.timer
+    content: |
+      [Unit]
+      Description=Daily OpenSCAP scan
+
+      [Timer]
+      OnCalendar=*-*-* 03:00:00
+      RandomizedDelaySec=30m
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+  - path: /etc/systemd/system/hh-aide.service
+    content: |
+      [Unit]
+      Description=AIDE file-integrity check (ADR-008)
+
+      [Service]
+      Type=oneshot
+      Nice=10
+      ExecStart=/usr/local/sbin/hh-report-aide
+  - path: /etc/systemd/system/hh-aide.timer
+    content: |
+      [Unit]
+      Description=Daily AIDE check
+
+      [Timer]
+      OnCalendar=*-*-* 04:00:00
+      RandomizedDelaySec=30m
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  - sysctl --system
+  - install -d -m 0750 -o root -g healthyhires /etc/healthyhires /etc/healthyhires/otelcol /etc/healthyhires/falco
+  - install -d -m 2750 -o root -g healthyhires /var/log/healthyhires /var/log/healthyhires/journal /var/log/healthyhires/reports
+  - install -d -m 0700 -o root -g root /var/lib/healthyhires /var/lib/healthyhires/releases /var/lib/healthyhires/reports
+
+  # The Collector reads the audit log through the adm group (container-deployment.md §5). A full disk must not
+  # halt the host (ADR-017 deviation from CIS, which halts or drops to single-user): the oldest logs are rotated
+  # away instead, since they are already in Azure Monitor.
+  - sed -i 's/^log_group.*/log_group = adm/' /etc/audit/auditd.conf
+  - sed -i -e 's/^space_left_action.*/space_left_action = syslog/' -e 's/^admin_space_left_action.*/admin_space_left_action = rotate/' -e 's/^disk_full_action.*/disk_full_action = rotate/' -e 's/^disk_error_action.*/disk_error_action = syslog/' -e 's/^max_log_file_action.*/max_log_file_action = keep_logs/' /etc/audit/auditd.conf
+  # CIS: every setuid/setgid program on the root filesystem is audited when users run it.
+  - find / -xdev \( -perm -4000 -o -perm -2000 \) -type f | awk '{ print "-a always,exit -F path=" $1 " -F perm=x -F auid>=1000 -F auid!=unset -k privileged" }' > /etc/audit/rules.d/55-privileged.rules
+  - service auditd restart
+
+  # Updates are downloaded and reported, never applied unattended (infrastructure-operations-architecture.md §5.2).
+  - sed -i 's/^apply_updates.*/apply_updates = no/' /etc/dnf/automatic.conf
+
+  # SSH only over NetBird (ADR-014): not in the public zone, allowed on the NetBird interface wt0.
+  - systemctl enable --now firewalld
+  - firewall-cmd --permanent --zone=public --remove-service=ssh
+  - firewall-cmd --permanent --zone=public --add-service=http --add-service=https
+  - firewall-cmd --permanent --zone=internal --add-interface=wt0
+  - firewall-cmd --reload
+
+  - systemctl daemon-reload
+  - systemctl enable --now chronyd dnf-automatic.timer hh-journal-export.service hh-openscap.timer hh-aide.timer
+
+  # The rootless pod starts at boot without anyone logging in; its Podman socket feeds podman_stats.
+  - loginctl enable-linger healthyhires
+  - systemctl start "user@$(id -u healthyhires).service"
+  - systemctl --user -M healthyhires@ enable --now podman.socket
+
+  - netbird service install
+  - netbird service start

@@ -1,0 +1,43 @@
+# HealthyHires edge on the VM (ADR-003, container-deployment.md §1.2). The routes and headers live in site.caddy
+# next to this file, shared with the local configs/caddy/Caddyfile; this file adds what only production has: a
+# hostname with automatic HTTPS, and the metrics endpoint the Collector scrapes. Deploy both files to /etc/caddy.
+#
+# Values come from the environment, which the Quadlet unit supplies, so no hostname is committed here:
+#
+#   APP_HOST        the public hostname, e.g. <label>.<region>.cloudapp.azure.com (container-deployment.md §5)
+#   ACME_EMAIL      the contact address for Let's Encrypt expiry notices
+#   BLOB_ENDPOINT   https://<account>.blob.core.windows.net
+#   ENTRA_TENANT_ID, ENTRA_CLIENT_ID, API_SCOPE   the SPA's runtime settings (ADR-F013)
+#
+# API_UPSTREAM is left unset: the API is on localhost:8080 in the same pod, which is site.caddy's default.
+{
+	# Every container in the pod shares one network namespace and could reach the admin API, so it is off.
+	# Configuration changes are applied by restarting the container (container-deployment.md §1.2).
+	admin off
+
+	# Certificates come from Let's Encrypt over HTTP-01 / TLS-ALPN-01 on ports 80 and 443, and live on the
+	# caddy-data volume (ADR-003).
+	email {$ACME_EMAIL}
+
+	# Collect HTTP metrics for the scrape endpoint below.
+	metrics
+
+	log {
+		output stderr
+		format json
+	}
+}
+
+import site.caddy
+
+{$APP_HOST} {
+	import healthyhires_site
+	import access_log
+}
+
+# Prometheus metrics for the Collector (container-deployment.md §1.5). Loopback only, so nothing outside the pod
+# can read them; plain HTTP, because the traffic never leaves the network namespace.
+http://127.0.0.1:9180 {
+	bind 127.0.0.1
+	metrics /metrics
+}

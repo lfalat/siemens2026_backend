@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Daily AIDE check against the baseline taken after the first deploy (guide §9.3). Keeps the full report on the VM
+# and appends a one-line JSON summary to reports.log for the Collector (observability-architecture.md §3).
+#
+# AIDE's exit code is a bit mask: 1 added, 2 removed, 4 changed; 14 and above are errors. Any non-zero exit
+# raises a Review alert, and the baseline is re-taken only after the change is explained.
+set -uo pipefail
+
+report=/var/lib/healthyhires/reports/aide-$(date -u +%F).txt
+summary=/var/log/healthyhires/reports/reports.log
+
+aide --check > "$report" 2>&1
+rc=$?
+
+entries() { awk -v what="$1" '$0 ~ what" entries:" { print $NF; exit }' "$report" | tr -dc '0-9'; }
+printf '{"tool":"aide","exit":%d,"added":%d,"removed":%d,"changed":%d}\n' \
+    "$rc" "$(entries Added || true)" "$(entries Removed || true)" "$(entries Changed || true)" >> "$summary"
+
+find /var/lib/healthyhires/reports -name 'aide-*.txt' -mtime +14 -delete

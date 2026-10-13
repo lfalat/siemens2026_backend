@@ -1,0 +1,17 @@
+# Public edge and TLS terminator, with the frontend built into the image (container-deployment.md §1.2).
+[Unit]
+Description=HealthyHires edge (Caddy)
+
+[Container]
+ContainerName=healthyhires-caddy
+Image=@CADDY_IMAGE@
+Pod=healthyhires.pod
+EnvironmentFile=/etc/healthyhires/caddy.env
+Volume=caddy-data.volume:/data
+NoNewPrivileges=true
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

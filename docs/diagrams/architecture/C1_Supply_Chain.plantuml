@@ -1,0 +1,54 @@
+@startuml C1_Supply_Chain
+!define LOCAL .
+!include LOCAL/include.plantuml
+
+!include FONTAWESOME/users.puml
+!include FONTAWESOME/cloud.puml
+!include FONTAWESOME/shield_alt.puml
+!include FONTAWESOME/lock.puml
+!include FONTAWESOME/network_wired.puml
+
+LAYOUT_WITH_LEGEND()
+
+title C1 Supply Chain Context Diagram — Source → Artifact → Deploy
+
+' Actors
+Person(dev, "Developer", "Pushes commits and reviews pipelines", $sprite="users")
+
+' Source, CI and registry
+System_Ext(github, "GitHub", "Source control, CI and container registry", $sprite="cloud")
+
+System_Boundary(ci_runtime, "CI runtime", "Builds, scans and signs off-VM") {
+    Container_Ext(runner, "CI Runner", "GitHub-hosted Linux", "Builds images and the web frontend, runs Trivy, signs with Cosign")
+}
+
+System_Ext(trivy, "Trivy DB", "Vulnerability + SBOM feed", $sprite="shield_alt")
+System_Ext(cosign, "Cosign / Sigstore", "Artifact signing identity + transparency log", $sprite="lock")
+System_Ext(netbird, "NetBird", "Admin mesh; CI joins with an ephemeral setup key", $sprite="network_wired")
+
+' Target runtime: the Azure VM pulls signed images, no builds on the VM
+System_Boundary(vm, "Azure VM (AlmaLinux 10)", "Runtime only; pulls signed images, no builds") {
+    Container(caddy, "Caddy", "Podman", "Signed image, includes the web frontend bundle")
+    Container(api, "ASP.NET API", "Podman", "Signed modular monolith image (noble-chiseled)")
+    Container(otelc, "OpenTelemetry Collector", "Podman", "otelcol-contrib, pinned by digest")
+    Container(falco, "Falco", "Podman (privileged)", "Pinned by digest + signed rules file")
+    Container(clamav, "ClamAV", "Podman", "Upstream image, pinned by digest")
+}
+
+' Source -> build
+Rel(dev, github, "git push / merge / tag", "HTTPS / git")
+BiRel(github, runner, "Trigger pipeline; publish signed images", "Webhooks / OCI")
+Rel(runner, trivy, "Scan images and dependencies", "HTTPS")
+Rel(runner, cosign, "Sign + verify images", "OIDC / TUF")
+
+' Deploy
+Rel(github, caddy, "Pull signed image", "OCI")
+Rel(github, api, "Pull signed image", "OCI")
+Rel(github, otelc, "Pull pinned image + config", "OCI")
+Rel(github, falco, "Pull pinned image + rules", "OCI")
+Rel(github, clamav, "Pull pinned image", "OCI")
+Rel(runner, netbird, "Joins as ephemeral peer", "WireGuard")
+Rel(netbird, vm, "SSH to trigger deploy (no secrets delivered — Key Vault via managed identity)", "SSH over WireGuard")
+
+SHOW_LEGEND()
+@enduml

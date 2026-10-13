@@ -1,0 +1,64 @@
+@startuml C3_telemetry_pipeline
+!define LOCAL .
+!include LOCAL/include.plantuml
+
+!include FONTAWESOME/server.puml
+!include FONTAWESOME/exchange_alt.puml
+!include FONTAWESOME/shield_alt.puml
+!include FONTAWESOME/chart_line.puml
+!include FONTAWESOME/database.puml
+!include FONTAWESOME/cloud.puml
+!include FONTAWESOME/cogs.puml
+!include FONTAWESOME/envelope.puml
+!include FONTAWESOME/user_cog.puml
+!include FONTAWESOME/virus.puml
+
+LAYOUT_WITH_LEGEND()
+
+title C3 — Telemetry pipeline (signals, Collector, Azure Monitor, alerting)
+
+Person(operator, "Operator", "Reads dashboards, receives alerts", $sprite="user_cog")
+
+System_Boundary(vm, "Azure VM") {
+    Container(api, "healthyhires-api", "ASP.NET + OpenTelemetry", "Traces, metrics, logs; EF Core instrumentation", $sprite="cogs")
+    Container(caddy, "healthyhires-caddy", "Caddy", "Metrics; access and error logs", $sprite="server")
+    Container(falco, "healthyhires-falco", "Falco", "Runtime detections", $sprite="shield_alt")
+    Container(clamav, "healthyhires-clamav", "ClamAV", "Scan results, signature updates", $sprite="virus")
+    Container(host, "Host tools", "auditd, AIDE, OpenSCAP, journald", "Local files and journal", $sprite="server")
+    Container(otelc, "healthyhires-otelcol", "otelcol-contrib", "Collect, redact, sample, export", $sprite="exchange_alt")
+}
+
+System_Boundary(azmon, "Azure Monitor") {
+    Container(appinsights, "Application Insights", "Workspace-based", "Traces, requests, dependencies, app metrics", $sprite="chart_line")
+    ContainerDb(law, "Log Analytics workspace", "KQL", "Logs from the app, host, Falco and ClamAV; billed per GB ingested (first 5 GB/month free)", $sprite="database")
+    ContainerDb(platform, "Platform metrics", "Built-in, free", "VM, PostgreSQL, Blob Storage metrics", $sprite="chart_line")
+    Container(availability, "Availability tests", "Standard tests, EU locations", "Probe the public health endpoint from outside the VM", $sprite="cloud")
+    Container(alerts, "Alert rules + action group", "Azure Monitor Alerts", "Email notifications", $sprite="envelope")
+    Container(dashboards, "Workbooks / dashboards", "Azure portal", "Entra sign-in", $sprite="chart_line")
+}
+
+System_Ext(public_endpoint, "Public health endpoint", "Caddy -> API", $sprite="cloud")
+
+' Collection on the VM
+Rel(api, otelc, "OTLP", "localhost:4317/4318", $tags="monitoring")
+Rel(otelc, caddy, "Scrapes metrics", "Prometheus, localhost:9180", $tags="monitoring")
+Rel(falco, host, "JSON alerts", "journald", $tags="monitoring")
+Rel(clamav, host, "Logs", "journald", $tags="monitoring")
+Rel(otelc, host, "Reads journal, files, host and container metrics", "journald / filelog / hostmetrics / podman_stats", $tags="monitoring")
+
+' Export
+Rel(otelc, appinsights, "Traces, metrics, logs", "azuremonitor exporter", $tags="monitoring")
+Rel(appinsights, law, "Stores telemetry", $tags="monitoring")
+
+' Alerting and viewing
+Rel(availability, public_endpoint, "Synthetic HTTP checks", "HTTPS", $tags="networking")
+Rel(availability, alerts, "Failures", $tags="monitoring")
+Rel(law, alerts, "Log alert rules (Falco, ClamAV, errors)", $tags="monitoring")
+Rel(platform, alerts, "Metric alert rules", $tags="monitoring")
+Rel(alerts, operator, "Email", $tags="monitoring")
+Rel(operator, dashboards, "Queries and dashboards", "HTTPS / Entra ID", $tags="viz")
+Rel(dashboards, law, "Queries", $tags="viz")
+Rel(dashboards, platform, "Queries", $tags="viz")
+
+SHOW_LEGEND()
+@enduml

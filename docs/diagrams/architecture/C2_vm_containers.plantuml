@@ -1,0 +1,67 @@
+@startuml C2_vm_containers
+!define LOCAL .
+!include LOCAL/include.plantuml
+
+!include FONTAWESOME/users.puml
+!include FONTAWESOME/server.puml
+!include FONTAWESOME/cogs.puml
+!include FONTAWESOME/shield_alt.puml
+!include FONTAWESOME/lock.puml
+!include FONTAWESOME/exchange_alt.puml
+!include FONTAWESOME/cloud.puml
+!include FONTAWESOME/virus.puml
+!include FONTAWESOME/network_wired.puml
+
+LAYOUT_WITH_LEGEND()
+LAYOUT_LEFT_RIGHT()
+
+title C2 — Containers inside the Azure VM (on-host only)
+
+Person(ci, "CI Runner / Operator", "Reaches the VM only over NetBird SSH", $sprite="users")
+
+System_Boundary(vm_box, "Azure VM", "AlmaLinux 10; public IP; NSG allows TCP 80/443 only; rootless Podman + systemd") {
+
+    Container(kernel, "Linux kernel", "Kernel, SELinux enforcing", "eBPF probes attach here", $sprite="server")
+
+    Container(caddy, "healthyhires-caddy", "Podman (rootless Quadlet)", "Public :80/:443 (unprivileged port start = 80); automatic HTTPS; serves the web frontend; proxies the API", $sprite="server")
+    Container(api, "healthyhires-api", "Podman (rootless Quadlet)", "ASP.NET modular monolith; ALTCHA verification in-process; no host publication", $sprite="cogs")
+    Container(clamav, "healthyhires-clamav", "Podman (rootless Quadlet)", "clamd :3310 on the pod network; freshclam updates signatures", $sprite="virus")
+    Container(otelc, "healthyhires-otelcol", "Podman (rootless Quadlet)", "otelcol-contrib; OTLP :4317/:4318 on localhost; exports to Azure Monitor", $sprite="exchange_alt")
+    Container(falco, "healthyhires-falco", "Podman (rootful Quadlet, privileged)", "eBPF runtime detection; JSON to the journal", $sprite="shield_alt")
+
+    ContainerDb(hostlogs, "Host telemetry sources", "Files + journal", "journald, auditd (CIS rules), AIDE and OpenSCAP reports, host and container metrics", $sprite="server")
+
+    Container(imds, "Instance Metadata Service", "169.254.169.254", "Issues managed identity tokens for Key Vault, Blob, PostgreSQL, ACS, Azure OpenAI, Azure Monitor", $sprite="lock")
+    Container(quadlet, "systemd + Podman Quadlet", "systemd generator", "Unit lifecycle, autorestart, ordering", $sprite="cloud")
+    Container(netbird, "NetBird agent", "systemd service", "wt0 interface; sshd listens here only", $sprite="network_wired")
+}
+
+' Request path
+Rel(caddy, api, "Proxies API requests", "HTTP / localhost:8080 (shared pod network)", $tags="networking")
+Rel(api, clamav, "Streams uploaded files for scanning", "clamd INSTREAM :3310", $tags="storage")
+
+' Identity
+Rel(api, imds, "Gets managed identity tokens", "HTTP", $tags="secrets")
+Rel(otelc, imds, "Gets managed identity tokens", "HTTP", $tags="secrets")
+
+' Telemetry
+Rel(api, otelc, "Traces, metrics, logs", "OTLP / localhost", $tags="monitoring")
+Rel(otelc, caddy, "Scrapes metrics", "Prometheus / localhost:9180", $tags="monitoring")
+Rel(falco, kernel, "Attaches eBPF probes; watches exec, egress, sensitive files, IMDS access", $tags="secrets")
+Rel(falco, hostlogs, "Writes JSON alerts", "journal", $tags="monitoring")
+Rel(clamav, hostlogs, "Scan results and update logs", "journal", $tags="monitoring")
+Rel(otelc, hostlogs, "Reads", "journald / filelog / hostmetrics / podman_stats", $tags="monitoring")
+
+' Lifecycle
+Rel(quadlet, caddy, "Lifecycles")
+Rel(quadlet, api, "Lifecycles")
+Rel(quadlet, clamav, "Lifecycles")
+Rel(quadlet, otelc, "Lifecycles")
+Rel(quadlet, falco, "Lifecycles (privileged)")
+
+' Admin access
+Rel(ci, netbird, "SSH over NetBird; public TCP 22 closed", "WireGuard", $tags="networking")
+Rel(netbird, quadlet, "Deploy: pull signed images, restart units", "SSH", $tags="networking")
+
+SHOW_LEGEND()
+@enduml

@@ -1,0 +1,6 @@
+# Accepted Trivy findings (ADR-008, ADD §6.2). A Critical or High finding blocks a release unless it is listed
+# here with a reason and a date to look at it again — the same rule as ZAP false positives (ADR-020).
+#
+# Format: one vulnerability id per line, preceded by a comment:
+#   # <reason> — review by YYYY-MM-DD
+#   CVE-2026-12345

@@ -1,0 +1,75 @@
+@startuml C2_Containers
+!define LOCAL .
+!include LOCAL/include.plantuml
+
+!include FONTAWESOME/users.puml
+!include FONTAWESOME/user_tie.puml
+!include FONTAWESOME/user_cog.puml
+!include FONTAWESOME/chart_line.puml
+!include FONTAWESOME/database.puml
+!include FONTAWESOME/cogs.puml
+!include FONTAWESOME/server.puml
+!include FONTAWESOME/network_wired.puml
+!include FONTAWESOME/lock.puml
+!include FONTAWESOME/cloud.puml
+!include FONTAWESOME/envelope.puml
+!include FONTAWESOME/shield_alt.puml
+!include FONTAWESOME/virus.puml
+!include FONTAWESOME/brain.puml
+
+LAYOUT_LEFT_RIGHT()
+LAYOUT_WITH_LEGEND()
+
+title C2 Container Diagram — Infrastructure & Core Flows
+
+' Users
+Person(applicant, "Applicant", "Anonymous; job listings and applications", $sprite="users")
+Person(staff, "Staff", "HR worker, admin, owner", $sprite="user_tie")
+Person(operator, "Operator", "Runs and monitors the platform", $sprite="user_cog")
+
+System_Boundary(azure, "Azure (EU region)") {
+
+    Container(vm, "Azure VM", "AlmaLinux 10, public IP, NSG: 80/443 only", "Caddy (TLS, web frontend), ASP.NET modular monolith, OTel Collector, Falco, ClamAV — rootless Podman + Quadlet", $sprite="server")
+
+    ContainerDb(postgres, "Azure Database for PostgreSQL", "Flexible Server, private VNet access", "One schema per module; automated backups", $sprite="database")
+    Container_Ext(blob, "Azure Blob Storage", "One container per module", "CVs, cover letters and other files; backups", $sprite="cloud")
+    Container_Ext(keyvault, "Azure Key Vault", "Secrets + keys", "Remaining secrets (ALTCHA key, Azure Monitor connection string) and KEKs", $sprite="lock")
+    Container_Ext(monitor, "Azure Monitor", "Application Insights + Log Analytics", "Traces, metrics, logs, alerts; availability tests", $sprite="chart_line")
+    Container_Ext(acs, "ACS Email", "Azure Communication Services", "Notification emails, verified custom domain", $sprite="envelope")
+    Container_Ext(openai, "Azure OpenAI", "gpt-4o, Standard deployment, Sweden Central", "Scores CVs against role requirements; advisory only", $sprite="brain")
+}
+
+System_Ext(entra, "Microsoft Entra ID", "Company tenant; OIDC, MFA, app roles", $sprite="lock")
+System_Ext(letsencrypt, "Let's Encrypt", "ACME CA", $sprite="shield_alt")
+System_Ext(clamav_mirror, "ClamAV signature mirror", "Behind a CDN", $sprite="virus")
+System_Ext(netbird, "NetBird", "Admin mesh (operator + CI SSH); no inbound port", $sprite="network_wired")
+Container_Ext(ci, "CI Runner", "GitHub Actions", "Builds, scans, signs; triggers deploys", $sprite="cogs")
+
+' Entry flows
+Rel(applicant, vm, "Browses job offers, submits applications (ALTCHA)", "HTTPS", $tags="networking")
+Rel(staff, vm, "Uses the application", "HTTPS", $tags="networking")
+Rel(staff, entra, "Signs in + MFA", "OIDC", $tags="auth")
+Rel(applicant, blob, "Uploads CV / cover letter", "HTTPS, write-only SAS", $tags="storage")
+Rel(staff, blob, "Downloads application files", "HTTPS, read-only SAS", $tags="storage")
+
+' Core application flows (all Azure access via the VM's managed identity)
+Rel(vm, postgres, "CRUD, one DbContext per module", "EF Core / TLS", $tags="storage")
+Rel(vm, blob, "Issues SAS URLs, streams uploads to ClamAV", "Blob API + managed identity", $tags="storage")
+Rel(vm, keyvault, "Reads secrets at startup", "HTTPS + managed identity", $tags="secrets")
+Rel(vm, acs, "Sends emails", "ACS Email SDK + managed identity", $tags="email")
+Rel(acs, staff, "Delivers emails", "SMTP", $tags="email")
+Rel(vm, openai, "Scores scanned CVs against role requirements", "HTTPS + managed identity", $tags="ai")
+Rel(vm, entra, "Validates tokens (OIDC discovery, JWKS)", "HTTPS", $tags="auth")
+Rel(vm, monitor, "Exports traces, metrics, logs", "azuremonitor exporter", $tags="monitoring")
+Rel(vm, letsencrypt, "Certificates", "ACME", $tags="cloud_net")
+Rel(vm, clamav_mirror, "Signature updates (freshclam)", "HTTPS, outbound only", $tags="cloud_net")
+Rel(monitor, vm, "Availability tests on the public health endpoint", "HTTPS", $tags="monitoring")
+
+' Operations
+Rel(operator, monitor, "Dashboards and alerts", "Azure portal", $tags="monitoring")
+Rel(operator, netbird, "SSH to the VM", "WireGuard", $tags="networking")
+Rel(ci, netbird, "Ephemeral peer for deploys", "WireGuard", $tags="networking")
+Rel(netbird, vm, "SSH on the NetBird interface only", "WireGuard (wt0)", $tags="networking")
+
+SHOW_LEGEND()
+@enduml

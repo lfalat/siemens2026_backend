@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Daily OpenSCAP scan against the CIS Level 1 Server profile, audit only (ADR-008). Keeps the full results on the
+# VM and appends a one-line JSON summary to reports.log, which the Collector exports; the alert rules read the
+# counts from it (observability-architecture.md §3, §10.3).
+set -uo pipefail
+
+profile=xccdf_org.ssgproject.content_profile_cis_server_l1
+content=$(ls /usr/share/xml/scap/ssg/content/ssg-almalinux10-ds.xml /usr/share/xml/scap/ssg/content/ssg-rhel10-ds.xml 2>/dev/null | head -n 1)
+tailoring=/etc/healthyhires/openscap-tailoring.xml
+results=/var/lib/healthyhires/reports/openscap-$(date -u +%F).xml
+summary=/var/log/healthyhires/reports/reports.log
+
+if [[ -z $content ]]; then
+    printf '{"tool":"openscap","error":1,"message":"no SCAP content for this OS"}\n' >> "$summary"
+    exit 1
+fi
+
+args=(xccdf eval --profile "$profile" --results "$results")
+[[ -f $tailoring ]] && args+=(--tailoring-file "$tailoring")
+oscap "${args[@]}" "$content" > /dev/null
+rc=$?   # 0 all passed, 2 some rules failed, anything else an error
+
+count() { grep -c "<result>$1</result>" "$results" 2>/dev/null || true; }
+printf '{"tool":"openscap","exit":%d,"pass":%d,"fail":%d,"error":%d,"notchecked":%d,"tailored":%s}\n' \
+    "$rc" "$(count pass)" "$(count fail)" "$(count error)" "$(count notchecked)" \
+    "$([[ -f $tailoring ]] && echo true || echo false)" >> "$summary"
+
+# Keep two weeks of full results.
+find /var/lib/healthyhires/reports -name 'openscap-*.xml' -mtime +14 -delete

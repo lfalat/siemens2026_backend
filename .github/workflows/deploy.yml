@@ -1,0 +1,177 @@
+# Build, scan, sign and deploy (container-deployment.md §3.3, C1 Supply Chain). Runs on every push to main and on
+# demand. The deploy job uses the GitHub environment "production", whose variables and secrets
+# scripts/azure/provision.sh sets — so moving to another Azure subscription changes only those, not this file.
+#
+# Action versions are pinned by tag; pin them by commit SHA once the repository's settings allow Dependabot.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # keyless Cosign signing
+    outputs:
+      api-image: ${{ steps.push.outputs.api }}
+      caddy-image: ${{ steps.push.outputs.caddy }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN }} # App and Api are private submodules
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test backend
+        run: dotnet test --solution Api/Api.slnx
+
+      # ADR-F014: npm dependencies are scanned too; the edge image holds only the built files, so the image scan
+      # would never see them.
+      - name: Scan npm dependencies
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: App/package-lock.json
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          trivyignores: .trivyignore
+          exit-code: '1'
+
+      - name: Image names
+        id: names
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "api=ghcr.io/$owner/healthyhires-api" >> "$GITHUB_OUTPUT"
+          echo "caddy=ghcr.io/$owner/healthyhires-caddy" >> "$GITHUB_OUTPUT"
+
+      # Both images are built into the runner's Docker daemon and scanned there. Only images that pass are pushed,
+      # so the registry never holds an unscanned or failing image, not even under `latest`.
+      - name: Build API image
+        run: |
+          dotnet publish Api/ApiService/ApiService.csproj -c Release -t:PublishContainer \
+            -p:ContainerRepository=healthyhires-api \
+            -p:ContainerImageTags=${{ github.sha }}
+          docker tag "healthyhires-api:${{ github.sha }}" "${{ steps.names.outputs.api }}:${{ github.sha }}"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build edge image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/caddy/Dockerfile
+          load: true
+          push: false
+          tags: ${{ steps.names.outputs.caddy }}:${{ github.sha }}
+
+      # ADD §6.2: no Critical or High finding may reach production, except those accepted in .trivyignore.
+      - name: Scan API image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ steps.names.outputs.api }}:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          trivyignores: .trivyignore
+          exit-code: '1'
+
+      - name: Scan edge image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ steps.names.outputs.caddy }}:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          trivyignores: .trivyignore
+          exit-code: '1'
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Pushed by commit and as `latest`; the deploy and the signature use the digest, never a tag.
+      - name: Push images
+        id: push
+        run: |
+          for name in api caddy; do
+            repo=$([[ $name == api ]] && echo "${{ steps.names.outputs.api }}" || echo "${{ steps.names.outputs.caddy }}")
+            docker tag "$repo:${{ github.sha }}" "$repo:latest"
+            docker push --quiet "$repo:${{ github.sha }}"
+            docker push --quiet "$repo:latest"
+            digest=$(docker buildx imagetools inspect "$repo:${{ github.sha }}" --format '{{json .Manifest}}' | jq -r .digest)
+            echo "$name=$repo@$digest" >> "$GITHUB_OUTPUT"
+          done
+
+      # The same Cosign release that verifies on the VM (deploy/host/hh-deploy), so the signature format matches.
+      - uses: sigstore/cosign-installer@v3.10.1
+        with:
+          cosign-release: v2.6.1
+
+      # Keyless: the certificate names this workflow on main, which is exactly what hh-deploy verifies.
+      - name: Sign images
+        run: cosign sign --yes "${{ steps.push.outputs.api }}" "${{ steps.push.outputs.caddy }}"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render release bundle
+        env:
+          RELEASE_ID: ${{ github.sha }}
+          API_IMAGE: ${{ needs.build.outputs.api-image }}
+          CADDY_IMAGE: ${{ needs.build.outputs.caddy-image }}
+          APP_HOST: ${{ vars.APP_HOST }}
+          ACME_EMAIL: ${{ vars.ACME_EMAIL }}
+          BLOB_ENDPOINT: ${{ vars.BLOB_ENDPOINT }}
+          PG_HOST: ${{ vars.PG_HOST }}
+          PG_USER: ${{ vars.PG_USER }}
+          KEY_VAULT_URI: ${{ vars.KEY_VAULT_URI }}
+          ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
+          ENTRA_CLIENT_ID: ${{ vars.ENTRA_CLIENT_ID }}
+          API_SCOPE: ${{ vars.API_SCOPE }}
+        run: deploy/render-bundle.sh "$RUNNER_TEMP/bundle.tgz"
+
+      # The runner joins the admin network with an ephemeral key; its peer disappears after the job (ADR-014).
+      - name: Join NetBird
+        env:
+          NB_SETUP_KEY: ${{ secrets.NETBIRD_SETUP_KEY }}
+        run: |
+          curl -fsSL https://pkgs.netbird.io/install.sh | sh
+          sudo netbird up --setup-key "$NB_SETUP_KEY" --hostname "gh-${{ github.run_id }}"
+          for _ in $(seq 30); do
+            nc -z -w 2 "${{ vars.VM_SSH_HOST }}" 22 && break
+            sleep 2
+          done
+
+      - name: Deploy
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s %s\n' "${{ vars.VM_SSH_HOST }}" "${{ vars.VM_SSH_HOST_KEY }}" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "deploy@${{ vars.VM_SSH_HOST }}" deploy < "$RUNNER_TEMP/bundle.tgz"
+
+      - name: Leave NetBird
+        if: always()
+        run: sudo netbird down || true

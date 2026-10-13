@@ -1,0 +1,10 @@
+<Project>
+  <!-- Versions for the root-repo projects only (AppHost). Everything under api/ is versioned by
+       api/Directory.Packages.props, so api/Api.slnx restores and builds on its own. -->
+  <ItemGroup>
+    <!-- Aspire hosting / orchestration; keep in step with the Aspire.AppHost.Sdk version in AppHost.csproj. -->
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.6.1" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.1" />
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.MailPit" Version="13.6.0" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,32 @@
+# The OpenTelemetry Collector (ADR-007.1, observability-architecture.md §2). Runs as root inside the user
+# namespace, which is the healthyhires user on the host: with keep-groups it reads the journal export and the
+# audit log through the healthyhires and adm groups, and nothing more.
+[Unit]
+Description=HealthyHires OpenTelemetry Collector
+
+[Container]
+ContainerName=healthyhires-otelcol
+Image=docker.io/otel/opentelemetry-collector-contrib:0.162.0@sha256:39923a8e431bd1f57be82411999d389fcfe40857492e4365456d97a4c1f74be6
+Pod=healthyhires.pod
+Exec=--config=/etc/otelcol/config.yaml
+User=0
+Group=0
+GroupAdd=keep-groups
+SecurityLabelDisable=true
+Volume=/etc/healthyhires/otelcol/config.yaml:/etc/otelcol/config.yaml:ro
+Volume=/var/log/healthyhires:/var/log/healthyhires:ro
+Volume=/var/log/audit:/var/log/audit:ro
+Volume=/:/hostfs:ro
+Volume=%t/podman/podman.sock:/run/podman/podman.sock
+# The connection string is read from Key Vault at every start (observability-architecture.md §2.4). Podman keeps
+# secrets in a file, so it is deleted again once the container has it in its environment (ADR-012: no secret on
+# disk); the next start reads it from Key Vault again.
+Secret=appinsights-connection-string,type=env,target=APPLICATIONINSIGHTS_CONNECTION_STRING
+
+[Service]
+ExecStartPre=/usr/local/bin/hh-podman-secret appinsights-connection-string
+ExecStartPost=/usr/bin/podman secret rm appinsights-connection-string
+Restart=always
+
+[Install]
+WantedBy=default.target

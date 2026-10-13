@@ -1,0 +1,117 @@
+# Checks on every pull request. Needs no Azure, NetBird or registry access (ADR-023: CI holds no Azure credentials).
+name: ci
+
+on:
+  pull_request:
+
+env:
+  DOTNET_NOLOGO: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN }} # App and Api are private submodules
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet test --solution Api/Api.slnx
+
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: App
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN }} # App and Api are private submodules
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: App/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run build
+      - name: Scan npm dependencies (ADR-F014)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: App/package-lock.json
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          trivyignores: .trivyignore
+          exit-code: '1'
+
+  infra:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # Compiles and lints the templates; no sign-in needed.
+      - run: az bicep build --file infra/main.bicep --stdout > /dev/null
+      - run: for f in deploy/host/hh-* deploy/render-bundle.sh scripts/azure/*.sh; do bash -n "$f"; done
+
+  # ADR-020: passive ZAP baseline scan through Caddy as a gate. The same edge as `just edge`, in front of the API
+  # running against throwaway PostgreSQL and Azurite. Accepted findings live in .zap/rules.tsv with their reasons.
+  zap:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: healthyhires
+          POSTGRES_PASSWORD: healthyhires-dev
+          POSTGRES_DB: healthyhires
+        ports: ['5432:5432']
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports: ['10000:10000']
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://localhost:5180
+      ConnectionStrings__healthyhires: Host=localhost;Database=healthyhires;Username=healthyhires;Password=healthyhires-dev
+      # Azurite's published, well-known development key; not a secret.
+      ConnectionStrings__blobs: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;
+      # A throttled scan reports clean without testing anything (ADR-020).
+      RateLimiting__PermitLimit: '1000000'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN }} # App and Api are private submodules
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: App/package-lock.json
+      - run: npm ci --prefix App && npm run build --prefix App
+      - name: Start the API
+        run: |
+          dotnet run --project Api/ApiService --no-launch-profile > "$RUNNER_TEMP/api.log" 2>&1 &
+          for _ in $(seq 60); do curl -fsS http://localhost:5180/health && exit 0; sleep 2; done
+          cat "$RUNNER_TEMP/api.log"; exit 1
+      - name: Start the edge
+        run: |
+          docker run -d --name edge --network host \
+            -v "$PWD/configs/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            -v "$PWD/configs_production/site.caddy:/etc/caddy/site.caddy:ro" \
+            -v "$PWD/App/dist:/srv:ro" \
+            -e API_UPSTREAM=localhost:5180 -e BLOB_ENDPOINT=http://localhost:10000 \
+            caddy:2.11.7@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772
+          for _ in $(seq 15); do curl -fsS http://localhost:8088/health && exit 0; sleep 1; done
+          exit 1
+      - uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: http://localhost:8088
+          rules_file_name: .zap/rules.tsv
+          fail_action: true
+          allow_issue_writing: false

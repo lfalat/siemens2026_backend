@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/Api/">
+    <Project Path="Api/ApiService/ApiService.csproj" />
+    <Project Path="Api/Tests/Tests.csproj" />
+  </Folder>
+  <Folder Name="/Api/Modules/">
+    <Project Path="Api/Modules/AuditModule/AuditModule.csproj" />
+    <Project Path="Api/Modules/FilesModule/FilesModule.csproj" />
+    <Project Path="Api/Modules/RecruitmentModule/RecruitmentModule.csproj" />
+  </Folder>
+  <Folder Name="/Api/Shared/">
+    <Project Path="Api/Shared/Kernel/Kernel.csproj" />
+    <Project Path="Api/Shared/ServiceDefaults/ServiceDefaults.csproj" />
+  </Folder>
+  <Project Path="AppHost/AppHost.csproj" />
+</Solution>

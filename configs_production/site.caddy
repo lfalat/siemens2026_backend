@@ -1,0 +1,125 @@
+# The HealthyHires site: every route and response header. Imported by Caddyfile.production next to it, and by the
+# local configs/caddy/Caddyfile, which is started with this file mounted beside it — so the stack that ZAP,
+# Playwright and k6 run against locally is the edge that is deployed. Keep this the only copy. Each top-level file
+# supplies only what differs: the site address, TLS, and the environment variables below.
+#
+#   API_UPSTREAM    where the API listens — localhost:8080 inside the pod (container-deployment.md §1.1);
+#                   set explicitly when the local Caddyfile is started
+#   BLOB_ENDPOINT   the Blob Storage origin the browser uploads to and downloads from (ADR-A010)
+#   ENTRA_TENANT_ID, ENTRA_CLIENT_ID, API_SCOPE
+#                   the frontend's runtime settings, served as /config.json (ADR-F013)
+#
+# Routes, most specific first (Caddy sorts `handle` blocks by path specificity; the bare one is the fallback):
+#
+#   /api/*        → the API (JSON only)
+#   /hubs/*       → the API's SignalR hubs (ADR-A014)
+#   /health       → the API, for the availability tests (ADR-016). /alive, /scalar and /openapi are NOT routed:
+#                   from the internet they fall through to the frontend like any unknown path.
+#   /config.json  → generated here from the environment, never cached
+#   /assets/*     → hashed build output, cached for a year
+#   everything else → the React app; unknown paths get index.html so client-side routes work (ADR-F004)
+
+(healthyhires_site) {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+
+		# Nothing here is meant to be embedded by another site; the browser refuses cross-origin no-cors loads.
+		# Entra ID's silent-renewal iframe is a navigation, not a subresource load, so it is unaffected.
+		Cross-Origin-Resource-Policy same-origin
+
+		# Inert over plain HTTP — browsers ignore HSTS on a non-secure origin — so a no-op locally and correct
+		# in production. Deliberately no `preload`: that is a one-way door for the whole domain.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+		# Don't advertise the proxy or its version.
+		-Server
+	}
+
+	# `handle`, not `handle_path`: the API's routes already begin with /api (MapGroup("/api/v{version:apiVersion}")),
+	# so stripping the prefix would make every request a 404.
+	handle /api/* {
+		# The API returns JSON and nothing else. A default-deny CSP costs nothing here and turns any future
+		# accidental HTML response inert.
+		header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+
+		# CVs and cover letters never pass through here — they go straight to Blob Storage on a SAS URL
+		# (ADR-A010) — so every body is JSON. 4 MB is far above any real request.
+		request_body {
+			max_size 4MB
+		}
+
+		# Caddy sets X-Forwarded-For itself and discards any value a client sends, because no trusted_proxies
+		# are configured: Caddy is the edge. The API trusts the header only from loopback, i.e. from here, for
+		# its per-IP rate limit (ADR-A007).
+		reverse_proxy {$API_UPSTREAM:localhost:8080}
+	}
+
+	# SignalR hubs are mapped at /hubs, not under /api. reverse_proxy passes the WebSocket upgrade through as-is.
+	# No body cap: it would apply to the long-polling transport's POSTs, and the frames are small anyway.
+	handle /hubs/* {
+		header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		reverse_proxy {$API_UPSTREAM:localhost:8080}
+	}
+
+	# Readiness only, cached and rate limited by the API itself (container-deployment.md §1.3).
+	handle /health {
+		header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		reverse_proxy {$API_UPSTREAM:localhost:8080}
+	}
+
+	# One frontend build runs in every environment; what differs between them is read from here at startup.
+	# Generated from the environment rather than shipped as a file, so nothing environment-specific is baked
+	# into the image. None of these values is a secret: the SPA is a public client (ADR-F006).
+	handle /config.json {
+		header Content-Type application/json
+		header Cache-Control no-store
+		respond `\{"entraTenantId":"{$ENTRA_TENANT_ID}","entraClientId":"{$ENTRA_CLIENT_ID}","apiScope":"{$API_SCOPE}"}` 200
+	}
+
+	# Vite's output: every file name carries a content hash, so a file never changes under its name.
+	# Only files that exist are marked immutable; a missing chunk — an old tab asking for a file from the
+	# previous release — gets a plain 404 rather than index.html cached for a year.
+	handle /assets/* {
+		root * /srv
+		@exists file
+		header @exists Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle {
+		root * /srv
+
+		# index.html names the current hashed assets, so it must be revalidated on every load.
+		header Cache-Control no-cache
+
+		# The React app (ADR-F006, ADR-F007, ADR-F009, ADR-F013):
+		#   script-src 'self'             only the bundle; no inline scripts, no CDN
+		#   style-src 'unsafe-inline'     Fluent UI v9 (Griffel) inserts its styles at runtime
+		#   connect-src                   the API (same origin, incl. the SignalR WebSocket), Entra ID's token
+		#                                 endpoint, and Blob Storage for direct uploads and downloads
+		#   frame-src                     MSAL renews tokens silently in a hidden iframe on Entra ID
+		#   worker-src blob:              the ALTCHA widget solves its proof of work in a Web Worker
+		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://login.microsoftonline.com {$BLOB_ENDPOINT}; frame-src https://login.microsoftonline.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Access log as JSON to stderr, i.e. the journal, which the Collector forwards (container-deployment.md §1.5).
+# Query strings are removed at the source: they can carry an access token (SignalR's ?access_token=) or a search
+# term an applicant typed. Caddy already redacts the Authorization and Cookie headers by default.
+(access_log) {
+	log {
+		output stderr
+		format filter {
+			request>uri regexp "\?.*$" ""
+			wrap json
+		}
+	}
+}

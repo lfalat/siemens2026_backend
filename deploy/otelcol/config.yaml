@@ -1,0 +1,143 @@
+# OpenTelemetry Collector on the VM (ADR-007.1, observability-architecture.md §2). Every signal leaves the VM
+# through the azuremonitor exporter to Application Insights.
+
+extensions:
+  health_check:
+    endpoint: localhost:13133
+
+receivers:
+  # The API, inside the pod only.
+  otlp:
+    protocols:
+      grpc:
+        endpoint: localhost:4317
+      http:
+        endpoint: localhost:4318
+
+  # Caddy's metrics; the job name becomes service.name.
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: caddy
+          scrape_interval: 60s
+          static_configs:
+            - targets: [localhost:9180]
+
+  # Memory, filesystem and load only: CPU, network and disk I/O are free platform metrics (§4.1).
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 60s
+    scrapers:
+      memory: {}
+      load: {}
+      filesystem:
+        metrics:
+          system.filesystem.utilization:
+            enabled: true
+        exclude_fs_types:
+          fs_types: [tmpfs, devtmpfs, overlay, squashfs, proc, sysfs, cgroup2, nsfs, fuse.portal]
+          match_type: strict
+
+  podman_stats:
+    endpoint: unix:///run/podman/podman.sock
+    collection_interval: 60s
+
+  # The journal, exported as JSON lines by hh-journal-export.service (the image has no journalctl).
+  filelog/journal:
+    include: [/var/log/healthyhires/journal/journal.json]
+    start_at: end
+    operators:
+      - type: json_parser
+      - type: move
+        from: attributes.MESSAGE
+        to: body
+        if: 'attributes.MESSAGE != nil'
+
+  filelog/audit:
+    include: [/var/log/audit/audit.log]
+    start_at: end
+
+  # One JSON line per OpenSCAP or AIDE run, from deploy/host/hh-report-*.
+  filelog/reports:
+    include: [/var/log/healthyhires/reports/reports.log]
+    start_at: end
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  batch: {}
+
+  resource/host:
+    attributes:
+      - key: service.name
+        value: host
+        action: upsert
+
+  # Only the units observability-architecture.md §2.1 lists; everything else in the journal is dropped,
+  # including the API's console log, which already arrives over OTLP. Caddy's /health access lines go too.
+  filter/journal:
+    error_mode: ignore
+    logs:
+      log_record:
+        - >-
+          not (attributes["CONTAINER_NAME"] == "healthyhires-falco"
+          or attributes["CONTAINER_NAME"] == "healthyhires-clamav"
+          or attributes["CONTAINER_NAME"] == "healthyhires-caddy"
+          or attributes["_SYSTEMD_UNIT"] == "sshd.service"
+          or attributes["_SYSTEMD_UNIT"] == "netbird.service"
+          or attributes["_SYSTEMD_UNIT"] == "waagent.service"
+          or attributes["SYSLOG_IDENTIFIER"] == "sudo")
+        - 'attributes["CONTAINER_NAME"] == "healthyhires-caddy" and IsMatch(body, "\"uri\":\"/health")'
+
+  # service.name per source (§2.3): set on each record, then groupbyattrs moves it to the resource.
+  transform/journal:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["service.name"], "host")
+          - set(attributes["service.name"], "falco") where attributes["CONTAINER_NAME"] == "healthyhires-falco"
+          - set(attributes["service.name"], "clamav") where attributes["CONTAINER_NAME"] == "healthyhires-clamav"
+          - set(attributes["service.name"], "caddy") where attributes["CONTAINER_NAME"] == "healthyhires-caddy"
+          - keep_keys(attributes, ["service.name", "CONTAINER_NAME", "_SYSTEMD_UNIT", "SYSLOG_IDENTIFIER", "PRIORITY", "_HOSTNAME"])
+
+  groupbyattrs/journal:
+    keys: [service.name]
+
+exporters:
+  azuremonitor:
+    connection_string: ${env:APPLICATIONINSIGHTS_CONNECTION_STRING}
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      level: normal
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [azuremonitor]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, batch]
+      exporters: [azuremonitor]
+    metrics/host:
+      receivers: [hostmetrics, podman_stats]
+      processors: [memory_limiter, resource/host, batch]
+      exporters: [azuremonitor]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [azuremonitor]
+    logs/journal:
+      receivers: [filelog/journal]
+      processors: [memory_limiter, filter/journal, transform/journal, groupbyattrs/journal, batch]
+      exporters: [azuremonitor]
+    logs/host:
+      receivers: [filelog/audit, filelog/reports]
+      processors: [memory_limiter, resource/host, batch]
+      exporters: [azuremonitor]

@@ -1,0 +1,9 @@
+# Build context for deploy/caddy/Dockerfile: only App/ and configs_production/ are copied.
+**/node_modules
+**/dist
+**/bin
+**/obj
+artifacts
+TestResults
+.git
+infra/azure.env

@@ -1,0 +1,9 @@
+# The application pod (container-deployment.md §1.1): Caddy, the API, the Collector and ClamAV share one
+# network namespace and reach each other on localhost. Only Caddy's ports are published.
+[Pod]
+PodName=healthyhires
+PublishPort=80:80
+PublishPort=443:443
+
+[Install]
+WantedBy=default.target

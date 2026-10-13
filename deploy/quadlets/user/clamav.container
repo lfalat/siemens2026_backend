@@ -1,0 +1,15 @@
+# clamd on localhost:3310; signatures on a persistent volume (container-deployment.md §1.4).
+[Unit]
+Description=HealthyHires ClamAV
+
+[Container]
+ContainerName=healthyhires-clamav
+Image=docker.io/clamav/clamav:1.5.4@sha256:638d90201ee7ee6a82d249a2fc23b132e578673b5f1f2766852b127676ca1ef6
+Pod=healthyhires.pod
+Volume=clamav-db.volume:/var/lib/clamav
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
