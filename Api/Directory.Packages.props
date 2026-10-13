@@ -1,0 +1,44 @@
+<Project>
+  <ItemGroup>
+    <!-- Aspire client integrations (the hosting side lives in the root props); each registers its
+         client together with a health check that /health reports. -->
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.6.1" />
+    <PackageVersion Include="Aspire.Azure.Npgsql" Version="13.6.1" />
+    <!-- API versioning (ADR-A004) -->
+    <PackageVersion Include="Asp.Versioning.Http" Version="10.2.3" />
+    <PackageVersion Include="Asp.Versioning.Mvc.ApiExplorer" Version="10.2.1" />
+    <PackageVersion Include="Asp.Versioning.OpenApi" Version="10.2.3" />
+    <!-- CQRS handler scanning and decorator registration (ADR-A003) -->
+    <PackageVersion Include="Scrutor" Version="7.0.0" />
+    <!-- Persistence (ADR-A005) -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+    <!-- ASP.NET Core / OpenAPI (ADR-A004) -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.16.11" />
+    <!-- Extensions -->
+    <!-- HybridCache (ADR-A006) -->
+    <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.10.0" />
+    <!-- Log redaction (ADR-A009): the classification attributes live in Kernel, the redactors in the host. -->
+    <PackageVersion Include="Microsoft.Extensions.Compliance.Redaction" Version="10.10.0" />
+    <PackageVersion Include="Microsoft.Extensions.Telemetry" Version="10.10.0" />
+    <PackageVersion Include="Microsoft.Extensions.Telemetry.Abstractions" Version="10.10.0" />
+    <!-- Resilience (ADR-A011) and service discovery -->
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.10.0" />
+    <!-- OpenTelemetry (ADR-A009) -->
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.1" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.19.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.19.0" />
+    <!-- Testing -->
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="OpenTelemetry.Exporter.InMemory" Version="1.19.1" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
+  </ItemGroup>
+</Project>

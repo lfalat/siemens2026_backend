@@ -1,0 +1,11 @@
+# Build output (Directory.Build.props routes it to artifacts/)
+artifacts/
+bin/
+obj/
+TestResults/
+
+# Local settings
+*.user
+.vs/
+.idea/
+appsettings.Development.local.json

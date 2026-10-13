@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Shared kernel is consumed by every module; emit XML docs for IntelliSense across the solution. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The idempotency context; the provider (Npgsql) is chosen by the host, so the Kernel stays provider-free. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <!-- The data-classification attributes, and the [LoggerMessage] generator that carries them onto
+         log fields so the host's redactors can erase them. Flows to every project that references Kernel. -->
+    <PackageReference Include="Microsoft.Extensions.Telemetry.Abstractions" />
+    <!-- Assembly scanning for CQRS handlers and the decorator chain around them (ADR-A003). -->
+    <PackageReference Include="Scrutor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The idempotency middleware and endpoint metadata need the HTTP and endpoint-routing types. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tests" />
+  </ItemGroup>
+
+</Project>

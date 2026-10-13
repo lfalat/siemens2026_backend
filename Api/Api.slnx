@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/Modules/">
+    <Project Path="Modules/AuditModule/AuditModule.csproj" />
+    <Project Path="Modules/FilesModule/FilesModule.csproj" />
+    <Project Path="Modules/RecruitmentModule/RecruitmentModule.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="Shared/Kernel/Kernel.csproj" />
+    <Project Path="Shared/ServiceDefaults/ServiceDefaults.csproj" />
+  </Folder>
+  <Project Path="ApiService/ApiService.csproj" />
+  <Project Path="Tests/Tests.csproj" />
+</Solution>
