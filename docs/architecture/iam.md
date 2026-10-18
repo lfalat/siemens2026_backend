@@ -17,7 +17,7 @@
 | ----- | ------------------ | ---------- | ---------- |
 | **Applicant** | None (anonymous) | A member of the public applying for a job | Public job listings; submitting one application with a CV and cover letter |
 | **Staff user** | Entra ID (OIDC) | A recruiter, hiring manager or administrator with a company work account | Staff features, limited by their app role |
-| **Workload** | VM managed identity | The containers running on the VM (mainly the API and the OpenTelemetry Collector) | Key Vault, Blob Storage, PostgreSQL, ACS Email, Azure OpenAI and Azure Monitor, limited by Azure role assignments |
+| **Workload** | VM managed identity | The containers running on the VM (mainly the API and the OpenTelemetry Collector) | Key Vault, Blob Storage, PostgreSQL, ACS Email, Azure OpenAI and Azure Monitor, limited by Azure role assignments; Microsoft Graph, to create staff accounts |
 | **CI pipeline** | GitHub Actions tokens + stored deploy secrets | The GitHub Actions workflow | Pushing images, signing them, deploying to the VM over NetBird |
 | **Operator** | Personal Entra, GitHub and NetBird accounts + SSH key | The person administering the platform | Azure portal, Entra admin, GitHub, the VM over SSH |
 
@@ -59,7 +59,7 @@ Roles are **app roles** defined on the HealthyHires API app registration and ass
 | ---------------- | --- | ----------- |
 | `Recruiter` | Recruiters (*náboroví pracovníci*), who run the hiring process | TODO — define per module |
 | `HiringManager` | Hiring managers (*prijímajúci manažéri*), for whose team a position is filled | TODO — define per module |
-| `Admin` | Administrators (*administrátori*) | TODO — define per module |
+| `Admin` | Administrators (*administrátori*) | Creates staff accounts (Recruitment, `POST /api/v1/recruitment/staff-users`); TODO — the rest per module |
 
 Roles are assigned to individual users. Group-based assignment requires Entra ID P1, which a free tenant lacks.
 
@@ -89,7 +89,7 @@ Claims the API relies on:
 | Event | Handling |
 | ----- | -------- |
 | **Login** | MSAL redirect → Entra sign-in page → MFA if required → redirect back with an authorization code → MSAL exchanges it for tokens (PKCE). |
-| **Account creation** | No self-registration. An administrator creates the user in Entra and assigns an app role ([ADR-004](ADR.md#adr-004-identity-provider--microsoft-entra-id-oidc)). |
+| **Account creation** | No self-registration ([ADR-004](ADR.md#adr-004-identity-provider--microsoft-entra-id-oidc)). An administrator creates a recruiter in HealthyHires: the API creates the Entra account as `username@<Entra:UserDomain>` with the `Recruiter` role and a random temporary password, returned once to the administrator and changed at the first sign-in. If the role cannot be assigned, the account is deleted again. Other roles are assigned in the Entra admin center. |
 | **Logout** | MSAL `logoutRedirect` clears the tokens in the browser and ends the user's Entra session in that browser. |
 | **Offboarding** | Disabling the account in Entra blocks new sign-ins and token renewal immediately; existing access tokens expire within ~90 minutes (§2.2). |
 | **MFA** | Enforced by the tenant: security defaults on a free tenant, Conditional Access policies with Entra ID P1. HealthyHires does not implement MFA itself. |
@@ -125,6 +125,7 @@ Each permission is an Azure role assigned to the managed identity, scoped as nar
 | PostgreSQL | Login role for the managed identity, member of the NOLOGIN role `healthyhires_app`; created by the server's Entra admin (`scripts/azure/db-grant-identity.sh`) | The module schemas listed in `infra/db-schemas.txt`, owned by `healthyhires_app`; no right to create other schemas | API | Log in without a password ([ADR-006](ADR.md#adr-006-primary-database--postgresql-managed)) |
 | ACS Email | A role on the ACS resource that allows sending email (least-privilege role TODO) | The ACS resource | API | Send notification emails ([ADR-010](ADR.md#adr-010-email-delivery--azure-communication-services-email)) |
 | Azure OpenAI | Cognitive Services OpenAI User | The Azure OpenAI resource | API | Call the deployed model to score CVs; cannot read keys or change deployments ([ADR-024](ADR.md#adr-024-cv-scoring--azure-openai-gpt-4o-sweden-central)) |
+| Microsoft Graph | Application permissions `User.ReadWrite.All`, `Application.Read.All`, `AppRoleAssignment.ReadWrite.All`; granted by a Privileged Role Administrator (`scripts/azure/graph-grant-identity.sh`) | The tenant | API | Create staff accounts and assign them an app role on the HealthyHires API (§2.4) |
 | Application Insights | Monitoring Metrics Publisher | The Application Insights resource | Collector | Only if the Collector sends telemetry with Entra authentication (see §9) |
 
 ### 4.3 The shared-identity risk
@@ -133,6 +134,8 @@ There is one managed identity per VM, and **every container on the VM can reach 
 
 - Falco alerts on IMDS access from unexpected containers ([ADR-011](ADR.md#adr-011-runtime-container-security--falco)).
 - Role assignments are scoped per secret, key and schema, so the identity holds no broad "Owner" or "Contributor" rights.
+
+The Graph permissions are the exception: they cannot be scoped below the tenant. `User.ReadWrite.All` lets the holder create and change non-admin users, and `AppRoleAssignment.ReadWrite.All` lets it grant any app role in the tenant, including further Graph permissions to itself. A token stolen through IMDS is therefore a tenant-level compromise, not only a HealthyHires one, which makes restricting IMDS access (§9) more pressing.
 
 Blocking IMDS for every container except the API and the Collector would remove the risk but needs per-container network rules (§9).
 
@@ -181,6 +184,7 @@ The deploy user should be restricted to the deploy command (a forced command in 
 - No Azure identity is used locally: Azurite, a PostgreSQL container, ClamAV and Mailpit replace the Azure services, and secrets come from .NET user secrets or environment variables.
 - CV scoring is the exception: there is no local stand-in for the model, so a developer calls the real Azure OpenAI resource with their own Azure CLI sign-in. Bicep grants the operator Cognitive Services OpenAI User on it.
 - Staff sign-in still uses the real Entra tenant; `http://localhost:5173`, the Vite dev server, is registered as an SPA redirect URI.
+- Creating a staff account calls Microsoft Graph as the developer's Azure CLI sign-in, so it works only for a developer whose own Entra roles allow it (User Administrator and Application Administrator, or Global Administrator), and needs `Entra:UserDomain` as a user secret of the AppHost.
 - Test tools (Schemathesis, k6, ZAP) get an access token for a dedicated test user via the Azure CLI ([ADR-009](ADR.md#adr-009-api-testing--contract-validation--schemathesis)); Playwright signs in with a TOTP-enabled test user ([ADR-019](ADR.md#adr-019-end-to-end-testing--playwright)).
 
 ## 9. Open items
@@ -189,4 +193,5 @@ The deploy user should be restricted to the deploy command (a forced command in 
 - [ ] Define the permissions of `Recruiter`, `HiringManager` and `Admin` per module.
 - [ ] Confirm the least-privilege role for sending email through ACS with a managed identity.
 - [ ] Restrict IMDS access to the API and Collector containers (§4.3).
+- [ ] Narrow the managed identity's tenant-wide Graph permissions (§4.3), e.g. by moving staff-account creation to the administrator's own delegated token.
 - [ ] Restrict the CI deploy user to a forced deploy command (§6).

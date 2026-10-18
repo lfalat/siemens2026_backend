@@ -63,6 +63,7 @@ The API never reads an AppHost-specific setting. Aspire hands it ordinary config
 | `services__clamav__tcp__0` | `clamav`'s `tcp` endpoint, through service discovery | nothing yet — reserved for the upload scanner |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | the Aspire dashboard | `AddServiceDefaults()` |
 | `Entra__TenantId`, `Entra__ApiClientId` | `Entra:TenantId`, `Entra:ApiClientId` in the AppHost's `appsettings.json` (identifiers, not secrets); a user secret overrides them | `AddStaffAuthentication()`; without them staff endpoints answer `401` |
+| `Entra__UserDomain` | `Entra:UserDomain`, a user secret of the AppHost | `AddRecruitmentModule()`; without it creating a staff user fails |
 
 **Start order.** `apiservice` waits for `postgres`, `blobs` and `mailpit`, so it never starts against a database that is not accepting connections. It deliberately does **not** wait for ClamAV: on the VM the API runs while ClamAV is down, and uploads stay in the "scanning" state until it is ready. The local stack keeps that behaviour rather than hiding it.
 

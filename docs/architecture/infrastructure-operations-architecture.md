@@ -62,7 +62,7 @@ infra/
 ├── azure.env.example   # template for the gitignored infra/azure.env
 ├── cloud-init.yaml     # first boot; embeds deploy/host/*
 └── modules/            # policy, network, vm, postgres, storage, keyvault, email, openai, monitoring
-scripts/azure/          # provision.sh, enrol-netbird.sh, db-grant-identity.sh, migrate.sh
+scripts/azure/          # provision.sh, enrol-netbird.sh, db-grant-identity.sh, graph-grant-identity.sh, migrate.sh
 ```
 
 - **Names** follow the Azure abbreviations with the environment as a suffix, e.g. `vm-healthyhires-prod`, `rg-healthyhires-prod`. Globally unique names (storage account, Key Vault, PostgreSQL) get a 6-character `uniqueString()` suffix derived from the subscription, so they differ on every subscription without anyone choosing them.
@@ -103,7 +103,7 @@ The commands are in the [Azure deployment guide](../operations/azure-deployment-
 3. **GitHub:** `provision.sh github` copies the deployment's outputs, the VM's NetBird address and SSH host key, and the deploy key into the GitHub environment.
 4. **Secrets:** Bicep stores the Application Insights connection string itself; any other Key Vault secret value is set with `az keyvault secret set`.
 5. **Break-glass:** `provision.sh breakglass` sets a random Serial Console password for the `breakglass` user; the plaintext goes only to Key Vault.
-6. **Database role:** `scripts/azure/db-grant-identity.sh`, as the server's Entra admin: a NOLOGIN role `healthyhires_app` owns the schemas, and the managed identity's login role is a member of it ([iam.md §4.2](iam.md#42-role-assignments)).
+6. **Database role and Graph permissions:** `scripts/azure/db-grant-identity.sh`, as the server's Entra admin: a NOLOGIN role `healthyhires_app` owns the schemas, and the managed identity's login role is a member of it. Then `scripts/azure/graph-grant-identity.sh`, as a Privileged Role Administrator, for creating staff accounts ([iam.md §4.2](iam.md#42-role-assignments)).
 7. **First deploy:** run the CI deploy workflow ([container-deployment.md §3.3](container-deployment.md#33-deployment-and-rollback)).
 8. **Readiness:** complete the checks in §4.2 before pointing the hostname at the VM or announcing it to staff.
 
@@ -126,7 +126,7 @@ The VM holds no business data, so it is replaced rather than repaired when it is
 
 1. Delete the VM and its OS disk, and remove its peer in NetBird.
 2. Redeploy `main.bicep`. It recreates the VM, and with it a **new** system-assigned managed identity; the role assignments in the template follow it automatically.
-3. Repeat §4.1 steps 2, 3, 5, 6, 7 and 8. The PostgreSQL login role is bound to the old identity, so `db-grant-identity.sh` creates one for the new identity and drops the old one; objects stay owned by `healthyhires_app`.
+3. Repeat §4.1 steps 2, 3, 5, 6, 7 and 8. The PostgreSQL login role is bound to the old identity, so `db-grant-identity.sh` creates one for the new identity and drops the old one; objects stay owned by `healthyhires_app`. The Graph permissions went with the old identity, so `graph-grant-identity.sh` grants them again.
 
 A compromised host is never cloned or snapshotted into its replacement.
 

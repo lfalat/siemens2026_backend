@@ -63,7 +63,9 @@ var apiService = builder.AddProject<Projects.ApiService>("apiservice")
 // tenant and the API registration and are not secrets (iam.md §5). A user secret overrides them, e.g. to try another
 // tenant:  dotnet user-secrets set Entra:TenantId <tenant-id> --project AppHost
 // Without them the API still runs, and every staff endpoint answers 401.
-foreach (var key in new[] { "TenantId", "ApiClientId" })
+// UserDomain is the domain new staff accounts are created in (Recruitment's CreateUser); without it creating one fails:
+//   dotnet user-secrets set Entra:UserDomain <verified-domain> --project AppHost
+foreach (var key in new[] { "TenantId", "ApiClientId", "UserDomain" })
 {
     if (builder.Configuration[$"Entra:{key}"] is { Length: > 0 } value)
         apiService.WithEnvironment($"Entra__{key}", value);

@@ -143,6 +143,7 @@ Then add to `infra/azure.env`:
 | `HH_ENTRA_TENANT_ID` | The company tenant's id (*Overview*) |
 | `HH_ENTRA_CLIENT_ID` | The **SPA**'s Application (client) id |
 | `HH_API_SCOPE` | `api://<api-client-id>/access_as_user` |
+| `HH_ENTRA_USER_DOMAIN` | A verified domain of the tenant (*Domain names*); staff accounts the API creates sign in as `username@<domain>` |
 
 The API validates tokens against the id inside `HH_API_SCOPE`, so keep the Application ID URI in the default `api://<api-client-id>` form; with any other form the API refuses to start.
 
@@ -218,13 +219,19 @@ gh secret set NETBIRD_SETUP_KEY --repo <owner>/healthyhires --env production
 
 ## 9. Grant the Database Login and Deploy
 
-### 9.1 Database login
+### 9.1 Database login and Graph permissions
 
 ```bash
 just azure-db-grant
 ```
 
 It opens an SSH tunnel to PostgreSQL through the VM, signs in with your Entra token, creates the group role `healthyhires_app` and the login role for the VM's managed identity, and drops login roles of earlier VMs. The API never has a password.
+
+```bash
+just azure-graph-grant
+```
+
+It grants the managed identity the Microsoft Graph application permissions `User.ReadWrite.All`, `Application.Read.All` and `AppRoleAssignment.ReadWrite.All`, which administrators need to create staff accounts in HealthyHires ([iam.md §4.2](../architecture/iam.md#42-role-assignments)). Granting them is admin consent, so your account needs the Entra role *Privileged Role Administrator* or *Global Administrator*.
 
 ### 9.2 First deploy
 
@@ -289,7 +296,7 @@ The VM holds no business data, so it is replaced rather than repaired ([infrastr
 az vm delete --resource-group rg-healthyhires-prod --name vm-healthyhires-prod --yes
 ```
 
-Remove the old peer in the NetBird dashboard, then repeat §6 (`just azure-deploy`), §7 (including `just azure-breakglass`), §8 (`just azure-github`), §9.1 and a deploy (`gh workflow run deploy`). The new VM has a new managed identity, which is why the database grant has to run again.
+Remove the old peer in the NetBird dashboard, then repeat §6 (`just azure-deploy`), §7 (including `just azure-breakglass`), §8 (`just azure-github`), §9.1 and a deploy (`gh workflow run deploy`). The new VM has a new managed identity, which is why both grants have to run again.
 
 ### 10.3 Pausing Between Demos
 
@@ -388,7 +395,7 @@ Edit `infra/azure.env` for the new subscription: `HH_SUBSCRIPTION_ID`, and `HH_O
 1. §6 — `just azure-check`, `just azure-what-if`, `just azure-deploy`
 2. §7 — a new one-off NetBird key, `just azure-netbird`, then `just azure-breakglass`
 3. §8 — `just azure-github` (overwrites the GitHub environment, including a new deploy key)
-4. §9.1 — `just azure-db-grant`
+4. §9.1 — `just azure-db-grant`, `just azure-graph-grant`
 
 ### 11.5 Import and deploy
 
@@ -426,5 +433,6 @@ Run the checks in §9.3, including the AIDE baseline. When everything works, del
 | `azure-deploy` warns that Azure refused the budget | The offer does not support Cost Management budgets. Everything else was deployed; watch *Cost analysis* yourself |
 | `deploy` or `ci` fails in a Trivy step | A Critical or High vulnerability in an image or npm package. Update the dependency or base image; only if no fix exists, add it to `.trivyignore` with a reason |
 | `ci` fails in the ZAP step | A new ZAP warning. Fix the header or response; only an accepted finding goes into `.zap/rules.tsv`, with its reason |
+| Creating a staff user answers `502` with `Authorization_RequestDenied` | The managed identity lacks the Graph permissions: run `just azure-graph-grant`. Fresh grants can take up to an hour to reach its tokens |
 | The API logs `permission denied for schema` or `for database` | The module's schema is missing from `infra/db-schemas.txt`, or `just azure-db-grant` was not run after adding it |
 | The browser shows a certificate error right after the first deploy | Caddy is still getting the Let's Encrypt certificate; wait a minute. Port 80 must be reachable for it |

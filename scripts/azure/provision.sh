@@ -108,7 +108,7 @@ github() {
     need gh jq
     require_deploy_key
     local repo=$HH_GITHUB_REPOSITORY env=production principal netbird_ip host_key
-    for name in HH_ENTRA_TENANT_ID HH_ENTRA_CLIENT_ID HH_API_SCOPE; do
+    for name in HH_ENTRA_TENANT_ID HH_ENTRA_CLIENT_ID HH_API_SCOPE HH_ENTRA_USER_DOMAIN; do
         [[ -n "${!name:-}" ]] || die "$name is empty in $env_file (guide §4)"
     done
 
@@ -134,6 +134,7 @@ github() {
     set_var ENTRA_TENANT_ID "$HH_ENTRA_TENANT_ID"
     set_var ENTRA_CLIENT_ID "$HH_ENTRA_CLIENT_ID"
     set_var API_SCOPE "$HH_API_SCOPE"
+    set_var ENTRA_USER_DOMAIN "$HH_ENTRA_USER_DOMAIN"
     set_var VM_SSH_HOST "$netbird_ip"
     set_var VM_SSH_HOST_KEY "$host_key"
     gh secret set DEPLOY_SSH_KEY --repo "$repo" --env "$env" < "$deploy_key"

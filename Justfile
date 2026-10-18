@@ -84,6 +84,10 @@ azure-breakglass:
 azure-db-grant:
   scripts/azure/db-grant-identity.sh
 
+# Gives the VM's managed identity the Graph permissions for creating staff accounts; again after every VM rebuild.
+azure-graph-grant:
+  scripts/azure/graph-grant-identity.sh
+
 # Pauses the deployment between demos: alerts off, VM deallocated, PostgreSQL stopped. Again within 7 days.
 azure-pause:
   scripts/azure/power.sh pause

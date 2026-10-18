@@ -147,6 +147,7 @@ jobs:
           ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
           ENTRA_CLIENT_ID: ${{ vars.ENTRA_CLIENT_ID }}
           API_SCOPE: ${{ vars.API_SCOPE }}
+          ENTRA_USER_DOMAIN: ${{ vars.ENTRA_USER_DOMAIN }}
         run: deploy/render-bundle.sh "$RUNNER_TEMP/bundle.tgz"
 
       # The runner joins the admin network with an ephemeral key; its peer disappears after the job (ADR-014).

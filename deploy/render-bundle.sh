@@ -11,7 +11,7 @@ out=${1:?usage: render-bundle.sh <output.tgz>}
 root=$(cd "$(dirname "$0")/.." && pwd)
 
 required=(RELEASE_ID API_IMAGE CADDY_IMAGE APP_HOST ACME_EMAIL BLOB_ENDPOINT PG_HOST PG_USER KEY_VAULT_URI
-    ENTRA_TENANT_ID ENTRA_CLIENT_ID API_SCOPE)
+    ENTRA_TENANT_ID ENTRA_CLIENT_ID API_SCOPE ENTRA_USER_DOMAIN)
 for name in "${required[@]}"; do
     [[ -n "${!name:-}" ]] || { echo "render-bundle: $name is not set" >&2; exit 1; }
 done
@@ -49,6 +49,7 @@ OTEL_SERVICE_NAME=healthyhires-api
 OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production,service.version=$RELEASE_ID
 Entra__TenantId=$ENTRA_TENANT_ID
 Entra__ApiClientId=$api_client_id
+Entra__UserDomain=$ENTRA_USER_DOMAIN
 EOF
 
 cat > "$work/env/caddy.env" <<EOF
