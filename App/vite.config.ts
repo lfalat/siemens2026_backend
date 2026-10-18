@@ -19,7 +19,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    server: { proxy },
+    // Fixed port: http://localhost:5173 is the SPA's registered redirect URI, and Entra accepts no other.
+    server: { proxy, port: 5173, strictPort: true },
     // `vite preview` serves the production build, so it gets the same routes.
     preview: { proxy },
   }

@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Runtime settings for the dev server, copied from config.example.json (ADR-F013)
+public/config.json
