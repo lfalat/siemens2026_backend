@@ -24,7 +24,7 @@ title C2 Container Diagram — Infrastructure & Core Flows
 
 ' Users
 Person(applicant, "Applicant", "Anonymous; job listings and applications", $sprite="users")
-Person(staff, "Staff", "HR worker, admin, owner", $sprite="user_tie")
+Person(staff, "Staff", "Recruiter, hiring manager, administrator", $sprite="user_tie")
 Person(operator, "Operator", "Runs and monitors the platform", $sprite="user_cog")
 
 System_Boundary(azure, "Azure (EU region)") {

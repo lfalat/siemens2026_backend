@@ -21,9 +21,9 @@ Containers, ports and host details are in [container-deployment.md](container-de
 | Actor | Authentication | Concerns |
 | ----- | -------------- | -------- |
 | **Applicant** | None — anonymous member of the public | Browses open job offers and applies with a CV and cover letter. |
-| **HR worker** | Entra ID work account, app role `Worker` | Reviews applications and works with candidates. |
-| **Admin** | Entra ID work account, app role `Admin` | Manages job offers and application settings. |
-| **Owner** | Entra ID work account, app role `Owner` | Full access to the company's hiring data. |
+| **Recruiter** | Entra ID work account, app role `Recruiter` | Publishes job offers, reviews applications and works with candidates. |
+| **Hiring Manager** | Entra ID work account, app role `HiringManager` | Reviews the candidates for positions in their team. |
+| **Administrator** | Entra ID work account, app role `Admin` | Manages the application; full access to the company's hiring data. |
 | **Platform Operator** | Personal Azure, GitHub and NetBird accounts | Deploys releases, administers the VM, watches alerts, handles incidents. |
 
 > **Note:** Staff accounts are pre-created by the company in Entra ID; there is no self-registration ([ADR-004](ADR.md#adr-004-identity-provider--microsoft-entra-id-oidc)). The exact permissions of each staff role are still to be defined ([iam.md §2.3](iam.md#23-roles-and-claims)). Today, all operator roles are one person.

@@ -32,6 +32,11 @@ done
 cp "$root/deploy/otelcol/config.yaml" "$work/otelcol/"
 cp "$root"/deploy/falco/*.yaml "$work/falco/"
 
+# The API validates staff tokens against the API registration, whose id is the middle of API_SCOPE
+# (api://<api-client-id>/access_as_user); ENTRA_CLIENT_ID is the SPA's, which the API never sees.
+api_client_id=${API_SCOPE#api://}
+api_client_id=${api_client_id%%/*}
+
 # The API connects with its managed identity: no password, so Aspire.Azure.Npgsql uses an Entra token, and the
 # session runs as the healthyhires_app group role that owns the schemas (scripts/azure/db-grant-identity.sh).
 cat > "$work/env/api.env" <<EOF
@@ -42,6 +47,8 @@ ConnectionStrings__blobs=$BLOB_ENDPOINT
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 OTEL_SERVICE_NAME=healthyhires-api
 OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production,service.version=$RELEASE_ID
+Entra__TenantId=$ENTRA_TENANT_ID
+Entra__ApiClientId=$api_client_id
 EOF
 
 cat > "$work/env/caddy.env" <<EOF

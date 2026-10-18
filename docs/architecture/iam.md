@@ -16,7 +16,7 @@
 | Actor | Identity mechanism | Represents | Can access |
 | ----- | ------------------ | ---------- | ---------- |
 | **Applicant** | None (anonymous) | A member of the public applying for a job | Public job listings; submitting one application with a CV and cover letter |
-| **Staff user** | Entra ID (OIDC) | An HR worker, admin or owner with a company work account | Staff features, limited by their app role |
+| **Staff user** | Entra ID (OIDC) | A recruiter, hiring manager or administrator with a company work account | Staff features, limited by their app role |
 | **Workload** | VM managed identity | The containers running on the VM (mainly the API and the OpenTelemetry Collector) | Key Vault, Blob Storage, PostgreSQL, ACS Email, Azure OpenAI and Azure Monitor, limited by Azure role assignments |
 | **CI pipeline** | GitHub Actions tokens + stored deploy secrets | The GitHub Actions workflow | Pushing images, signing them, deploying to the VM over NetBird |
 | **Operator** | Personal Entra, GitHub and NetBird accounts + SSH key | The person administering the platform | Azure portal, Entra admin, GitHub, the VM over SSH |
@@ -42,7 +42,7 @@ The tenant contains two app registrations, both **single-tenant** ("accounts in 
 2. The user signs in on `login.microsoftonline.com` with their work account and completes MFA if the tenant requires it.
 3. Entra returns an **ID token** (who the user is, for the UI) and an **access token** (a JWT for the API) to the browser.
 4. The React app sends the access token as `Authorization: Bearer <token>` on every API call.
-5. The API validates it locally with `Microsoft.Identity.Web`: signature against Entra's published signing keys (JWKS), issuer = the company tenant, audience = the API, and the token lifetime. It never calls Entra per request.
+5. The API validates it locally with ASP.NET Core's JWT bearer handler (`ApiService/Infrastructure/Auth/StaffAuthentication.cs`): signature against Entra's published signing keys (JWKS), issuer = the company tenant, audience = the API, and the token lifetime. Both v1.0 and v2.0 token formats are accepted. It never calls Entra per request.
 
 | Token | Lifetime (Entra defaults) | Handling |
 | ----- | ------------------------- | -------- |
@@ -57,11 +57,22 @@ Roles are **app roles** defined on the HealthyHires API app registration and ass
 
 | App role (value) | Who | Permissions |
 | ---------------- | --- | ----------- |
-| `Worker` | HR staff | TODO — define per module |
-| `Admin` | Administrators | TODO — define per module |
-| `Owner` | The company owner | TODO — define per module |
+| `Recruiter` | Recruiters (*náboroví pracovníci*), who run the hiring process | TODO — define per module |
+| `HiringManager` | Hiring managers (*prijímajúci manažéri*), for whose team a position is filled | TODO — define per module |
+| `Admin` | Administrators (*administrátori*) | TODO — define per module |
 
 Roles are assigned to individual users. Group-based assignment requires Entra ID P1, which a free tenant lacks.
+
+The API enforces them with the policies in `Kernel.Auth.StaffPolicies`. `Recruiter` and `HiringManager` are peers; `Admin` is admitted by every policy:
+
+| Policy | Admits |
+| ------ | ------ |
+| `staff` (also the default) | `Recruiter`, `HiringManager`, `Admin` |
+| `staff-recruiter` | `Recruiter`, `Admin` |
+| `staff-hiring-manager` | `HiringManager`, `Admin` |
+| `staff-admin` | `Admin` |
+
+Every policy also requires a token with the `access_as_user` scope (so app-only tokens are refused) and an `oid`. No valid token → `401`; a valid token with too low a role, or none → `403`.
 
 Claims the API relies on:
 
@@ -169,13 +180,13 @@ The deploy user should be restricted to the deploy command (a forced command in 
 
 - No Azure identity is used locally: Azurite, a PostgreSQL container, ClamAV and Mailpit replace the Azure services, and secrets come from .NET user secrets or environment variables.
 - CV scoring is the exception: there is no local stand-in for the model, so a developer calls the real Azure OpenAI resource with their own Azure CLI sign-in. Bicep grants the operator Cognitive Services OpenAI User on it.
-- Staff sign-in still uses the real Entra tenant; `https://localhost:<port>` is registered as an SPA redirect URI.
+- Staff sign-in still uses the real Entra tenant; `http://localhost:5173`, the Vite dev server, is registered as an SPA redirect URI.
 - Test tools (Schemathesis, k6, ZAP) get an access token for a dedicated test user via the Azure CLI ([ADR-009](ADR.md#adr-009-api-testing--contract-validation--schemathesis)); Playwright signs in with a TOTP-enabled test user ([ADR-019](ADR.md#adr-019-end-to-end-testing--playwright)).
 
 ## 9. Open items
 
 - [x] The Collector authenticates to Azure Monitor with the connection string from Key Vault ([container-deployment.md §5](container-deployment.md#5-open-items)).
-- [ ] Define the permissions of `Worker`, `Admin` and `Owner` per module.
+- [ ] Define the permissions of `Recruiter`, `HiringManager` and `Admin` per module.
 - [ ] Confirm the least-privilege role for sending email through ACS with a managed identity.
 - [ ] Restrict IMDS access to the API and Collector containers (§4.3).
 - [ ] Restrict the CI deploy user to a forced deploy command (§6).

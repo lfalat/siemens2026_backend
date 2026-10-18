@@ -15,7 +15,7 @@ title C1 System Context Diagram — HealthyHires
 
 ' Actors
 Person(applicant, "Applicant", "Anonymous member of the public. Browses job listings and applies with a CV and cover letter.", $sprite="users")
-Person(staff, "Staff", "HR worker, admin or owner. Signs in with a company work account.", $sprite="user_tie")
+Person(staff, "Staff", "Recruiter, hiring manager or administrator. Signs in with a company work account.", $sprite="user_tie")
 
 ' The system
 System(healthyhires, "HealthyHires", "Talent acquisition web application running on Azure: one VM (Caddy, ASP.NET modular monolith, OTel Collector, Falco, ClamAV), managed PostgreSQL, Blob Storage, Key Vault, Azure Monitor, ACS Email and Azure OpenAI (CV scoring, Sweden Central).")

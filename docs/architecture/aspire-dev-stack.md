@@ -62,6 +62,7 @@ The API never reads an AppHost-specific setting. Aspire hands it ordinary config
 | `ConnectionStrings__mailpit` | `mailpit` | nothing yet — reserved for the e-mail feature |
 | `services__clamav__tcp__0` | `clamav`'s `tcp` endpoint, through service discovery | nothing yet — reserved for the upload scanner |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | the Aspire dashboard | `AddServiceDefaults()` |
+| `Entra__TenantId`, `Entra__ApiClientId` | `Entra:TenantId`, `Entra:ApiClientId` in the AppHost's `appsettings.json` (identifiers, not secrets); a user secret overrides them | `AddStaffAuthentication()`; without them staff endpoints answer `401` |
 
 **Start order.** `apiservice` waits for `postgres`, `blobs` and `mailpit`, so it never starts against a database that is not accepting connections. It deliberately does **not** wait for ClamAV: on the VM the API runs while ClamAV is down, and uploads stay in the "scanning" state until it is ready. The local stack keeps that behaviour rather than hiding it.
 
@@ -82,7 +83,7 @@ Loading the signatures into memory still takes up to a minute after each start, 
 The stack runs **no identity provider**. Entra ID has no local emulator, and HealthyHires does not need one:
 
 - Anonymous applicants never sign in, so their flows work with nothing extra.
-- Staff sign in against the **real** Entra tenant, with `https://localhost:<port>` registered as an SPA redirect URI ([iam.md §8](iam.md#8-local-development)). The API validates tokens locally against Entra's published signing keys, so it needs the tenant and client ids but no secret.
+- Staff sign in against the **real** Entra tenant, with `http://localhost:5173` registered as an SPA redirect URI ([iam.md §8](iam.md#8-local-development)). The API validates tokens locally against Entra's published signing keys, so it needs the tenant and client ids but no secret.
 - No Azure managed identity is used locally: the Azure services it would authenticate to are replaced by the containers in §1.
 
 Staff sign-in is not wired into the API yet; until it is, every endpoint is anonymous locally as well.

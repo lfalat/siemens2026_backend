@@ -267,7 +267,7 @@ oversize response that could not be stored (`3202`) as a warning, and each reten
 
 ## Tests
 
-The tests live in `Api/Tests/Shared/Idempotency/` and `Api/Tests/ApiService/IdempotencyHeaderTransformerTests.cs`:
+The tests live in `Api/Tests/Shared/Idempotency/` and `Api/Tests/ApiService/OpenAPI/IdempotencyHeaderTransformerTests.cs`:
 
 | Tests | What they pin |
 | --- | --- |

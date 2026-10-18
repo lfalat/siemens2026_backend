@@ -392,10 +392,21 @@ If two modules need a small piece of *shared vocabulary* — a contract type, a 
 
 Full detail in [iam.md](../architecture/iam.md). There are two kinds of caller:
 
-- **Staff** sign in with Entra ID and send a bearer token. Their app role (`Worker`, `Admin` or `Owner`) arrives in the `roles` claim, and their `oid` identifies them in the database, e.g. as `created_by`. An endpoint declares what it needs with `.RequireAuthorization(...)`, and `auth.forbidden` is declared for it by rule. A validated token already proves the user exists, so **never re-query whether the acting user exists**.
+- **Staff** sign in with Entra ID and send a bearer token. Their app role (`Recruiter`, `HiringManager` or `Admin`) arrives in the `roles` claim, and their `oid` identifies them in the database, e.g. as `created_by`. An endpoint declares what it needs with `.RequireAuthorization(...)`, and `auth.forbidden` is declared for it by rule. A validated token already proves the user exists, so **never re-query whether the acting user exists**.
 - **Applicants** are anonymous. Their endpoints are protected by ALTCHA, the per-IP rate limit and short-lived SAS URLs, not by identity, and never answer `auth.unauthenticated`.
 
-Staff sign-in, the role policies and the current-user accessor are not wired yet (`TODO`); until they are, take the acting user as a parameter of the command rather than inventing one.
+In practice, using `Kernel.Auth`:
+
+```csharp
+RouteGroupBuilder staff = api.MapGroup("/recruitment").RequireStaff();   // any staff role; declares auth.unauthenticated
+staff.MapDelete("/job-offers/{id:guid}", Handler)
+     .RequireAuthorization(StaffPolicies.Recruiter);                       // narrows the group to Recruiter and Admin
+
+static Task<IResult> Handler(Guid id, ClaimsPrincipal user, ...) =>
+    ... new DeleteJobOffer(id, DeletedBy: user.GetStaffId()) ...;          // `oid`, never re-queried
+```
+
+`Admin` passes every policy; `Recruiter` and `HiringManager` each pass only their own and `staff` ([iam.md §2.3](../architecture/iam.md#23-roles-and-claims)). Never check a role name inside a handler; pick a policy on the endpoint. Commands take the acting user as a parameter, so handlers stay free of `HttpContext`.
 
 ## 11. Conventions cheat-sheet
 
@@ -415,7 +426,7 @@ Staff sign-in, the role policies and the current-user accessor are not wired yet
 
 ## 12. Testing
 
-Tests live in `Api/Tests`, mirroring the source layout: `Tests/<Name>Module/Features/…` for a module, `Tests/Shared/` for the Kernel, `Tests/ApiService/` for the host. They run on xUnit v3 with `dotnet test --solution Api/Api.slnx`.
+Tests live in `Api/Tests`, mirroring the source layout folder for folder: `Tests/<Name>Module/Features/…` for a module, `Tests/Shared/` for the Kernel (`Kernel/Errors` → `Tests/Shared/Errors`), `Tests/ApiService/` for the host (`ApiService/OpenAPI` → `Tests/ApiService/OpenAPI`). Only tests of `Program.cs` itself sit at the root of `Tests/ApiService/`. They run on xUnit v3 with `dotnet test --solution Api/Api.slnx`.
 
 Tests run against a **real PostgreSQL**, not an in-memory provider. The shared container builds a template database from `configs/postgres/init/01-create-db.sql`, and each schema-backed test gets a fresh clone (`PostgresTestHost.CreateDatabase`). The practical consequence: **seed data must satisfy the real schema** — foreign keys, check constraints and triggers all fire — so seed the rows a handler depends on, not a minimal stub. Blob Storage tests use Azurite through Testcontainers ([ADR-A010](../architecture/ADR-ASPNET.md#adr-a010-file-storage--azure-blob-storage-via-azure-sdk)).
 

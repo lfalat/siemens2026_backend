@@ -24,7 +24,9 @@
 
 	header {
 		X-Content-Type-Options nosniff
-		X-Frame-Options DENY
+		# A default (`?`): the React app relaxes it to SAMEORIGIN below. The `-Server` deletion makes Caddy apply
+		# this block last, so a plain set would overwrite that.
+		?X-Frame-Options DENY
 		Referrer-Policy no-referrer
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
 
@@ -102,9 +104,14 @@
 		#   style-src 'unsafe-inline'     Fluent UI v9 (Griffel) inserts its styles at runtime
 		#   connect-src                   the API (same origin, incl. the SignalR WebSocket), Entra ID's token
 		#                                 endpoint, and Blob Storage for direct uploads and downloads
-		#   frame-src                     MSAL renews tokens silently in a hidden iframe on Entra ID
+		#   frame-src                     MSAL renews tokens silently in a hidden iframe on Entra ID, which
+		#                                 redirects the iframe back to the site root ('self')
 		#   worker-src blob:              the ALTCHA widget solves its proof of work in a Web Worker
-		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://login.microsoftonline.com {$BLOB_ENDPOINT}; frame-src https://login.microsoftonline.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		#   frame-ancestors 'self'        that iframe loads this app at the site root, where the MSAL redirect
+		#                                 bridge hands the response to the parent page; other sites still cannot
+		#                                 frame the app. X-Frame-Options is relaxed to match for older browsers.
+		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://login.microsoftonline.com {$BLOB_ENDPOINT}; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+		header X-Frame-Options SAMEORIGIN
 
 		try_files {path} /index.html
 		file_server

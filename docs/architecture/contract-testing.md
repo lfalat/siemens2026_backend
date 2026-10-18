@@ -43,7 +43,7 @@ Staff endpoints need an Entra ID access token. Entra's password grant (ROPC) fai
 
 Details that make the token *useful*:
 
-- **The test user holds the `Owner` role**, so every staff endpoint is reachable. Per-role authorization is tested elsewhere (§5).
+- **The test user holds the `Admin` role**, so every staff endpoint is reachable. Per-role authorization is tested elsewhere (§5).
 - **The token's client is the Azure CLI, not the SPA.** If the API ever restricts which client applications may call it, the Azure CLI must stay allowed in the local stack — and only there.
 - **The token belongs to a real user**, so endpoints that depend on "who is signed in" (the `oid` claim) work. A client-credentials token would have no user behind it.
 - **It lasts about an hour**, which is enough for one run; the script requests a fresh one each time.
@@ -96,7 +96,7 @@ All checks are enabled:
 A green run is easy to over-read. It says nothing about:
 
 - **Business rules** — for example, that an application cannot be submitted to a closed job offer. These belong in the xUnit suite.
-- **Authorization per role** — the run uses one `Owner` identity, so it cannot show that an `HR.Worker` is refused an admin operation. Role policies are covered by xUnit tests.
+- **Authorization per role** — the run uses one `Admin` identity, so it cannot show that a `Recruiter` is refused an admin operation. Role policies are covered by xUnit tests.
 - **Idempotency semantics** — deliberately neutralised by fresh keys (§4.2). The replay, `409` and `422` behaviour is pinned in the xUnit suite.
 - **Bot protection and uploads** — ALTCHA is disabled and files never reach Azurite (§4.1).
 - **Staff sign-in** — the token comes from the Azure CLI; the browser sign-in flow belongs to Playwright.

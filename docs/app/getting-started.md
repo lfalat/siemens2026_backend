@@ -31,7 +31,15 @@ cp .env.example .env
 
 `.env` is gitignored. `API_URL` has no `VITE_` prefix, so Vite keeps it in `vite.config.ts` and never puts it in the bundle.
 
-The Entra ID settings the app will need for staff sign-in are not configured here: they come at runtime from `/config.json`, which Caddy generates in production ([ADR-F013](../architecture/ADR-FRONTEND.md#adr-f013-build-and-delivery--static-bundle-served-by-caddy)).
+### 3.1 Entra ID settings for staff sign-in
+
+The Entra ID settings are not build settings: the app reads them at runtime from `/config.json`, which Caddy generates in production ([ADR-F013](../architecture/ADR-FRONTEND.md#adr-f013-build-and-delivery--static-bundle-served-by-caddy)). Locally the dev server serves `App/public/config.json`, which is gitignored. Create it from the template:
+
+```bash
+cp config.example.json public/config.json
+```
+
+The template holds the real values for the HealthyHires tenant, so the copy works as is; none of them is a secret (iam.md §5). Only `/staff` reads the file; the public pages work without it.
 
 ## 4. Run the dev server
 
@@ -39,7 +47,7 @@ The Entra ID settings the app will need for staff sign-in are not configured her
 npm run dev
 ```
 
-Open `http://localhost:5173`. Vite prints the address; if 5173 is taken it picks the next free port. Changes reload in the browser immediately.
+Open `http://localhost:5173`. The port is fixed, because `http://localhost:5173` is the SPA's registered redirect URI and Entra ID rejects any other; if 5173 is taken, the dev server refuses to start. Changes reload in the browser immediately.
 
 ### 4.1 How API calls reach the backend
 
@@ -90,5 +98,8 @@ Vitest, React Testing Library and Playwright ([ADR-F012](../architecture/ADR-FRO
 | --- | --- | --- |
 | `/api` calls answer 502; Vite logs `http proxy error … ECONNREFUSED` | No API on `API_URL` | Start the API, or correct `API_URL` in `.env` and restart the dev server |
 | A changed `API_URL` has no effect | `vite.config.ts` is read once, at startup | Restart `npm run dev` |
-| The app opens on a port other than 5173 | 5173 was already in use | Use the address Vite prints, or stop the other process |
+| `npm run dev` fails with `Port 5173 is already in use` | Another process holds the port | Stop the other process |
+| `/staff` shows `/config.json is missing` or `has no valid …` | `public/config.json` was not created | See §3.1 |
+| Entra ID shows `AADSTS50011` (redirect URI mismatch) | The app is not on `http://localhost:5173`, or the URI is not registered on the SPA | Register it as a *Single-page application* redirect URI |
+| `/staff` shows "Your account has no access" (`AADSTS50105`) | The user has no app role on the HealthyHires API enterprise application | Assign a role ([iam.md §2.3](../architecture/iam.md#23-roles-and-claims)) |
 | `npm ci` fails with `package.json` and `package-lock.json` out of sync | A dependency was added without updating the lockfile | Run `npm install`, then commit `package-lock.json` |

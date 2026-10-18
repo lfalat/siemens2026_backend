@@ -21,7 +21,7 @@ HealthyHires is a **talent acquisition** application built for a single company'
 It serves two groups of users:
 
 - **Applicants (anonymous)** — members of the public with no account and no login. They can browse job listings and apply to a job offer by uploading a CV and a cover letter.
-- **Staff (authenticated)** — company employees who sign in with their work account through Microsoft Entra ID ([ADR-004](ADR.md#adr-004-identity-provider--microsoft-entra-id-oidc)). Their roles are **HR worker**, **admin** and **owner**, assigned as Entra app roles. Accounts are pre-created by the company; there is no self-registration.
+- **Staff (authenticated)** — company employees who sign in with their work account through Microsoft Entra ID ([ADR-004](ADR.md#adr-004-identity-provider--microsoft-entra-id-oidc)). Their roles are **recruiter**, **hiring manager** and **administrator**, assigned as Entra app roles. Accounts are pre-created by the company; there is no self-registration.
 
 The product is delivered as a single modular monolith backend ([ADR-A001](ADR-ASPNET.md#adr-a001-application-architecture--modular-monolith)) hosted on Azure ([ADR-001](ADR.md#adr-001-hosting-platform--azure-vm)) and used **only through web browsers**; there are no mobile or desktop clients.
 
@@ -85,7 +85,7 @@ Further views:
 | **Management** — `@management` | Vendor contracts, compliance posture. |
 | **Finance** — `@finance` | Azure spend and cost forecasting. |
 | **Applicants** (anonymous) | Easy job browsing, simple and reliable CV and cover letter upload, confirmation that an application was received. |
-| **Staff** (HR workers, admins, owner) | Sign-in with their work account, efficient application review, role-based access, safe-to-open applicant files, data correctness. |
+| **Staff** (recruiters, hiring managers, administrators) | Sign-in with their work account, efficient application review, role-based access, safe-to-open applicant files, data correctness. |
 
 > **Note:** Many roles are currently represented by one person.
 

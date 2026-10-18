@@ -130,7 +130,7 @@ In the [Entra admin center](https://entra.microsoft.com), signed in to the compa
 
 1. **HealthyHires API** — *App registrations → New registration*, single tenant, no redirect URI.
    - *Expose an API* → set the Application ID URI to `api://<api-client-id>` → add the scope `access_as_user` (admins and users can consent).
-   - *App roles* → create `Worker`, `Admin` and `Owner`, allowed member type *Users/Groups*.
+   - *App roles* → create `Recruiter`, `HiringManager` and `Admin` (the **Value**; display names *Recruiter*, *Hiring Manager*, *Administrator*), allowed member type *Users/Groups*.
 2. **HealthyHires SPA** — *New registration*, single tenant, redirect URI of type **Single-page application**: `https://<label>.germanywestcentral.cloudapp.azure.com`. For local development, also add `http://localhost:5173`.
    - *API permissions* → *Add* → *My APIs* → HealthyHires API → `access_as_user` → *Grant admin consent*.
 3. *Enterprise applications* → each of the two → *Properties* → **Assignment required = Yes**.
@@ -143,6 +143,8 @@ Then add to `infra/azure.env`:
 | `HH_ENTRA_TENANT_ID` | The company tenant's id (*Overview*) |
 | `HH_ENTRA_CLIENT_ID` | The **SPA**'s Application (client) id |
 | `HH_API_SCOPE` | `api://<api-client-id>/access_as_user` |
+
+The API validates tokens against the id inside `HH_API_SCOPE`, so keep the Application ID URI in the default `api://<api-client-id>` form; with any other form the API refuses to start.
 
 ## 5. Set Up NetBird
 

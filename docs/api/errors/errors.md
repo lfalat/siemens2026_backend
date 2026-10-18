@@ -158,7 +158,7 @@ group.MapPost("/job-offers/{id:guid}/applications", Handler)
 
 Some codes are declared once, not on every endpoint:
 
-- **On the versioned API group:** `CommonErrors.AnyEndpoint`, which is `request.malformed` and `request.rate_limited`. A staff group adds `auth.unauthenticated` once it requires sign-in. Anonymous applicant endpoints never answer it, which is why it is not in `AnyEndpoint`.
+- **On the versioned API group:** `CommonErrors.AnyEndpoint`, which is `request.malformed` and `request.rate_limited`. A staff group adds `auth.unauthenticated` through `.RequireStaff()`. Anonymous applicant endpoints never answer it, which is why it is not in `AnyEndpoint`.
 - **By rule, in `ErrorCodeDeclarationExtensions.Declared`:**
   - `concurrency.conflict` on every write except a `MapQuery` read;
   - `auth.forbidden` wherever an authorization policy applies;

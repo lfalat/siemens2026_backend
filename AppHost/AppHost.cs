@@ -59,6 +59,16 @@ var apiService = builder.AddProject<Projects.ApiService>("apiservice")
     .WaitFor(blobs)
     .WaitFor(mailpit);
 
+// Staff sign-in against the company tenant (iam.md §8). The ids are committed in appsettings.json: they identify the
+// tenant and the API registration and are not secrets (iam.md §5). A user secret overrides them, e.g. to try another
+// tenant:  dotnet user-secrets set Entra:TenantId <tenant-id> --project AppHost
+// Without them the API still runs, and every staff endpoint answers 401.
+foreach (var key in new[] { "TenantId", "ApiClientId" })
+{
+    if (builder.Configuration[$"Entra:{key}"] is { Length: > 0 } value)
+        apiService.WithEnvironment($"Entra__{key}", value);
+}
+
 // HTTPS when the API's launch profile has it, HTTP otherwise. Asking for an endpoint that does not exist throws,
 // and the dashboard then drops every URL of the resource, the API's own included.
 apiService.WithUrls(context =>
