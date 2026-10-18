@@ -17,6 +17,9 @@ public abstract class E2EPageTest : PageTest
 /// <param name="session">The run's shared sessions (an assembly fixture).</param>
 public abstract class StaffTest(StaffSession session) : BrowserTest
 {
+    /// <summary>The run's shared sessions, one per role.</summary>
+    protected StaffSession Session => session;
+
     /// <summary>A new page on the frontend, signed in as <paramref name="role"/>'s test user.</summary>
     /// <param name="role">One of <see cref="StaffRole"/>.</param>
     protected async Task<IPage> SignInAsAsync(string role)

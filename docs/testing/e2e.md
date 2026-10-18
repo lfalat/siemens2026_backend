@@ -64,7 +64,7 @@ It checks first that the frontend and the API answer, and says which one to star
 
 ## 3. How sign-in works
 
-The first staff test to use a role signs in as that role's user through the real Entra sign-in page, exactly as a person would: `/staff` redirects to Entra, the setup fills in the username and password, a code computed from the TOTP secret when Entra asks for one (under security defaults it does not on every sign-in), and answers *Stay signed in?*, and Entra redirects back. That happens **once per role per run** (`StaffSession`, an xUnit assembly fixture); every later page for that role gets a fresh browser context with the session copied in.
+The first staff test to use a role signs in as that role's user through the real Entra sign-in page, exactly as a person would: `/staff` redirects to Entra, the setup fills in the username and password, a code computed from the TOTP secret when Entra asks for one (under security defaults it does not on every sign-in), and answers *Stay signed in?*, and Entra redirects back. That happens **once per role per run** (`StaffSession`, an xUnit assembly fixture); every later page for that role gets a fresh browser context with the session copied in. The one exception is `SignInOutTests`: signing out ends the Entra session, so it signs the Recruiter in a second time in its own context. A user signing in twice in a run never reuses an authenticator code, which Entra would refuse; the second sign-in waits for the next code if needed.
 
 The session is copied in two parts, because MSAL keeps its tokens in **sessionStorage** ([ADR-F006](../architecture/ADR-FRONTEND.md#adr-f006-authentication--msal-react-with-entra-id)) and Playwright's storage state does not include sessionStorage:
 
@@ -81,7 +81,7 @@ Tests are grouped by who uses the page, in folders that mirror the frontend's ro
 
 ```text
 tests/e2e/
-├─ Infrastructure/      E2ESettings and StaffRole, StaffSession, the E2EPageTest and StaffTest base classes
+├─ Infrastructure/      E2ESettings and StaffRole, Entra (Microsoft's sign-in pages), StaffSession, the base classes
 ├─ Applicants/          Public pages; no sign-in
 └─ Staff/               Pages under /staff; signed in as the test user
 ```
@@ -125,7 +125,7 @@ A test about permissions can open two pages, e.g. `SignInAsAsync(StaffRole.Admin
 | *Entra wants this user to set up MFA first* | The user has no authenticator registered in Entra, whatever is on a phone. Register one with its secret key (§1.1), then `just e2e-setup` |
 | *Entra refused the authenticator code* | The stored secret key is not this user's (`just e2e-setup` again), or the computer's clock is off. The tests never retry a code, so the user is not locked out |
 | Sign-in times out on another Entra page | A prompt the setup does not know: a password change or consent. Sign in once by hand as the test user and finish it |
-| Sign-in fails after it worked before | Microsoft changed its sign-in page; update the selectors in `StaffSession` |
+| Sign-in fails after it worked before | Microsoft changed its sign-in page; update the selectors in `Entra` |
 | *AADSTS50105* | The test user has no app role on the HealthyHires API (§1.1) |
 | *AADSTS50011*, redirect URI mismatch | `E2E:BaseUrl` is not a registered SPA redirect URI (§2) |
 | The staff page loads but the greeting never appears | The API is not running, or rejects the token: check `just aspire-up` and the API's logs in the Aspire dashboard |
