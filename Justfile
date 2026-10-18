@@ -40,6 +40,20 @@ build:
 test:
   dotnet test --solution Api/Api.slnx
 
+# For whoever already has the test users: writes them to e2e-users.json, to hand to a teammate privately.
+e2e-export:
+  scripts/e2e.sh export
+
+# Installs the browser, then imports the test users from e2e-users.json (or asks for them).
+# One-time setup for the end-to-end tests.
+e2e-setup:
+  scripts/e2e.sh setup
+
+# Needs `just aspire-up` and `just app` running; checks both first. Extra arguments go to dotnet test.
+# Runs the browser end-to-end tests (docs/testing/e2e.md). HEADED=1 shows the browser.
+e2e *args:
+  scripts/e2e.sh run {{args}}
+
 # The AppHost keeps ClamAV's signatures in a named volume so it does not download them on every run;
 # the next run starts from the signatures bundled in the image. Stop the AppHost first.
 # Removes the ClamAV signature volume.

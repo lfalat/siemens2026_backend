@@ -32,6 +32,10 @@ New to the docs? Start with the [Architecture Description Document](architecture
 - [Idempotency](api/idempotency/idempotency.md) — the `Idempotency-Key` contract, defaults, per-endpoint overrides, claim lifecycle and limitations.
 - [Scheduling](api/scheduling/scheduling.md) — daily and periodic background workers: writing, registering, behaviour and the current schedule.
 
+## Testing
+
+- [End-to-End Tests](testing/e2e.md) — Playwright for .NET against the running stack: setup, the Entra test users per role, running, writing tests and troubleshooting.
+
 ## Database
 
 - [Database model documentation](db/README.md) — conventions, modules and tables, decision log and changelog.

@@ -13,4 +13,7 @@
     <Project Path="Api/Shared/ServiceDefaults/ServiceDefaults.csproj" />
   </Folder>
   <Project Path="AppHost/AppHost.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/e2e/E2E.csproj" />
+  </Folder>
 </Solution>

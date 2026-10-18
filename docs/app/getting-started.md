@@ -90,7 +90,7 @@ npm run format
 - `npm run format` rewrites files with Prettier; `npm run format:check` only reports, as CI does.
 - Lint and type errors fail the build, so run both before review.
 
-Vitest, React Testing Library and Playwright ([ADR-F012](../architecture/ADR-FRONTEND.md#adr-f012-testing--vitest-react-testing-library-and-playwright)) are not set up yet; their commands will be added here with the first tests.
+Vitest and React Testing Library ([ADR-F012](../architecture/ADR-FRONTEND.md#adr-f012-testing--vitest-react-testing-library-and-playwright)) are not set up yet; their commands will be added here with the first tests. Playwright end-to-end tests are a .NET project of their own: see [End-to-End Tests](../testing/e2e.md).
 
 ## 7. Troubleshooting
 
