@@ -18,6 +18,9 @@
     <PackageVersion Include="Scalar.AspNetCore" Version="2.16.11" />
     <!-- Staff sign-in: Entra access tokens validated as JWT bearer tokens (ADR-004, iam.md §2) -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
+    <!-- Staff accounts: Microsoft Graph, signed in with the VM's managed identity (iam.md §4.2) -->
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Microsoft.Graph" Version="6.8.0" />
     <!-- Extensions -->
     <!-- HybridCache (ADR-A006) -->
     <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.10.0" />

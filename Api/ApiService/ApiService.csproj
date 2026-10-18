@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Modules\RecruitmentModule\RecruitmentModule.csproj" />
     <ProjectReference Include="..\Shared\Kernel\Kernel.csproj" />
     <ProjectReference Include="..\Shared\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>

@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ApiService\ApiService.csproj" />
+    <ProjectReference Include="..\Modules\RecruitmentModule\RecruitmentModule.csproj" />
     <ProjectReference Include="..\Shared\Kernel\Kernel.csproj" />
   </ItemGroup>
 

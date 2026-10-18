@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using Kernel.Errors;
 using Microsoft.AspNetCore.Http;
+using RecruitmentModule.Domain;
 
 namespace Tests.Shared.Errors;
 
@@ -13,7 +14,7 @@ namespace Tests.Shared.Errors;
 public class ErrorCodeCatalogTests
 {
     /// <summary>Every catalog of codes. Named rather than discovered, so a catalog that drops out fails here.</summary>
-    private static readonly Type[] Catalogs = [typeof(CommonErrors), typeof(ValidationRuleErrors)];
+    private static readonly Type[] Catalogs = [typeof(CommonErrors), typeof(ValidationRuleErrors), typeof(RecruitmentErrors)];
 
     /// <summary>The DataAnnotations rule codes are one word each (<c>required</c>), the same for every field.</summary>
     private static readonly HashSet<IErrorCode> RuleCodes = [.. Catalog(typeof(ValidationRuleErrors))];

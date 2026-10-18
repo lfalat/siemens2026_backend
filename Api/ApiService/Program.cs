@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using RecruitmentModule;
 using Scalar.AspNetCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -121,6 +122,10 @@ builder.Services.AddRateLimiter(options =>
 
 // ADR-A008: native request validation
 builder.Services.AddValidation();
+
+// ── Modules (ADR-A001) ───────────────────────────────────
+builder.Services.AddRecruitmentModule();
+// ─────────────────────────────────────────────────────────
 
 // ADR-A003: CQRS. Each module registers its handlers with AddCqrsHandlers(assembly) in its own Add<Module>Module;
 // this wraps every command handler, once, in validation and then the event scope. It must come AFTER every
@@ -279,6 +284,7 @@ RouteGroupBuilder api = app.MapGroup("/api/v{version:apiVersion}")
 
 api.MapGet("/hello", () => "Hello, HealthyHires!");
 api.MapMe();
+api.MapRecruitmentModule();
 // ─────────────────────────────────────────────────────────
 
 await app.RunAsync();
