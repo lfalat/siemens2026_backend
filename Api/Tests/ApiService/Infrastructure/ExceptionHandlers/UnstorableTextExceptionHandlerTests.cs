@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using Npgsql;
 using Tests.Shared;
 
-namespace Tests.ApiService;
+namespace Tests.ApiService.Infrastructure.ExceptionHandlers;
 
 /// <summary>
 /// A NUL byte is legal in JSON and legal in a .NET string, and PostgreSQL's <c>text</c> cannot store it —

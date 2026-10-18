@@ -16,7 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 
-namespace Tests.ApiService.ErrorCodes;
+namespace Tests.ApiService.OpenAPI;
 
 /// <summary>
 /// Tests that <see cref="ErrorCodeTransformer"/> lists each operation's error codes under the response they are

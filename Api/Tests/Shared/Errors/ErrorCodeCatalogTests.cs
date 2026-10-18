@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 using Kernel.Errors;
 using Microsoft.AspNetCore.Http;
 
-namespace Tests.ApiService.ErrorCodes;
+namespace Tests.Shared.Errors;
 
 /// <summary>
 /// The rules every code catalog keeps, because a client keys its translations on the values (ADR-A017): no value

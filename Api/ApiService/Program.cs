@@ -2,11 +2,14 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using ApiService.Endpoints;
 using ApiService.Infrastructure;
+using ApiService.Infrastructure.Auth;
 using ApiService.Infrastructure.ExceptionHandlers;
 using ApiService.OpenAPI;
 using Asp.Versioning;
 using Asp.Versioning.Builder;
+using Kernel.Auth;
 using Kernel.CQRS;
 using Kernel.Errors;
 using Kernel.Idempotency;
@@ -27,6 +30,10 @@ builder.Logging.EnableRedaction();
 
 // Telemetry, health checks, service discovery and HttpClient resilience (Shared/ServiceDefaults).
 builder.AddServiceDefaults();
+
+// ADR-004: staff sign-in. Entra access tokens are validated locally as bearer tokens, and staff endpoints require one
+// of the role policies in Kernel.Auth.StaffPolicies (iam.md §2). Applicant endpoints carry no policy.
+builder.AddStaffAuthentication();
 
 // ADR-A014: SignalR. Hubs are mapped per feature, and only for signed-in staff — applicants never connect.
 builder.Services.AddSignalR();
@@ -61,8 +68,9 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(RateLimitPolicies.PerCaller, httpContext =>
     {
         // Staff are partitioned by their subject, so colleagues behind one office NAT do not share a budget.
-        // JwtBearer maps `sub` to NameIdentifier unless inbound claim mapping is turned off, so accept both.
-        string? subject = httpContext.User.FindFirstValue("sub")
+        // StaffAuthentication turns inbound claim mapping off, so `sub` arrives as `sub`; NameIdentifier covers
+        // a scheme that maps it.
+        string? subject = httpContext.User.FindFirstValue(StaffClaims.Subject)
                           ?? httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
         string partition = subject is { Length: > 0 }
             ? "user:" + subject
@@ -220,20 +228,26 @@ app.UseForwardedHeaders();
 app.UseExceptionHandler();
 
 // Gives a body to the error responses the framework produces without one. The routing miss (404), the method
-// mismatch (405) and, once sign-in exists, the authentication challenge (401) and authorization failure (403)
-// are written by middleware that sets a status and stops — no Content-Type, no payload — while the frontend
+// mismatch (405), the authentication challenge (401) and the authorization failure (403) are written by middleware that sets a status and stops — no Content-Type, no payload — while the frontend
 // maps API errors from ProblemDetails (ADR-F010). With AddProblemDetails registered above, this writes the same
 // shape as every other error. A response that already has a body, such as the rate limiter's 429, passes
 // through untouched.
 app.UseStatusCodePages();
 
-// ADR-A007: after UseAuthentication once staff sign-in is added, because the policy partitions by the
-// authenticated user and the principal does not exist before that point.
+// Resolves the staff user from the bearer token, if there is one. Only populates the principal; whether a request
+// may proceed is UseAuthorization's call below.
+app.UseAuthentication();
+
+// ADR-A007: after UseAuthentication, because the policy partitions by the authenticated user and the principal
+// does not exist before that point; before UseAuthorization, so a rejected request still spends budget and a
+// stream of bad tokens is throttled like anything else.
 app.UseRateLimiter();
 
+app.UseAuthorization();
+
 // ADR-A016: replay or short-circuit POST/PATCH requests carrying a repeated Idempotency-Key. Keys are scoped to
-// the signed-in user, so this stays after UseAuthentication once staff sign-in is added; before the endpoints
-// run either way.
+// the signed-in user, so this comes after UseAuthentication; after UseAuthorization too, so a request that is
+// refused never claims a key.
 app.UseIdempotency();
 
 if (app.Environment.IsDevelopment())
@@ -264,6 +278,7 @@ RouteGroupBuilder api = app.MapGroup("/api/v{version:apiVersion}")
     .ProducesErrors([.. CommonErrors.AnyEndpoint]);
 
 api.MapGet("/hello", () => "Hello, HealthyHires!");
+api.MapMe();
 // ─────────────────────────────────────────────────────────
 
 await app.RunAsync();

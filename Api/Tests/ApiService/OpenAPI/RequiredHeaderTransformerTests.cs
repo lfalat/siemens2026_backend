@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi;
 
-namespace Tests.ApiService;
+namespace Tests.ApiService.OpenAPI;
 
 /// <summary>
 /// A header an endpoint refuses to run without, enforced by a filter and absent from the document, is the

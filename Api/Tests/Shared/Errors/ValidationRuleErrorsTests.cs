@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Kernel.Errors;
 using Kernel.Validation;
 
-namespace Tests.Shared.Validation;
+namespace Tests.Shared.Errors;
 
 /// <summary>
 /// <see cref="ValidationRuleErrors.For"/> is the one map from a failing DataAnnotations attribute to the per-field code

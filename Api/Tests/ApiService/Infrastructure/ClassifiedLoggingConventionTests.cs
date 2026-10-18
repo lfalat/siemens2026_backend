@@ -2,7 +2,7 @@ using System.Reflection;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Logging;
 
-namespace Tests.ApiService;
+namespace Tests.ApiService.Infrastructure;
 
 /// <summary>
 /// Guards the half of the redaction pipeline that <see cref="TelemetryRedactionTests"/> cannot reach. Those tests

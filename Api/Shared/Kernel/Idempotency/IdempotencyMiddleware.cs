@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Kernel.Auth;
 using Kernel.Errors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -260,8 +261,8 @@ public sealed partial class IdempotencyMiddleware(
     /// </remarks>
     private static string BuildCacheKey(HttpContext context, string key)
     {
-        // JwtBearer maps `sub` to NameIdentifier unless inbound claim mapping is turned off, so accept both.
-        string actor = context.User.FindFirstValue("sub")
+        // The host turns inbound claim mapping off, so `sub` arrives as `sub`; NameIdentifier covers a scheme that maps it.
+        string actor = context.User.FindFirstValue(StaffClaims.Subject)
                        ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier)
                        ?? "anonymous";
 

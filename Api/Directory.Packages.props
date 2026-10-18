@@ -16,6 +16,8 @@
     <!-- ASP.NET Core / OpenAPI (ADR-A004) -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.16.11" />
+    <!-- Staff sign-in: Entra access tokens validated as JWT bearer tokens (ADR-004, iam.md §2) -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <!-- Extensions -->
     <!-- HybridCache (ADR-A006) -->
     <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.10.0" />

@@ -4,7 +4,7 @@ using Kernel.Errors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
-namespace Tests.ApiService;
+namespace Tests.ApiService.Infrastructure.ExceptionHandlers;
 
 /// <summary>
 /// The catch-all: a genuine fault is logged with the route template — not the path, which carries ids and applicant

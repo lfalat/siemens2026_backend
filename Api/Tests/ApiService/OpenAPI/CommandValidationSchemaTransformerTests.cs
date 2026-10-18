@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi;
 
-namespace Tests.ApiService;
+namespace Tests.ApiService.OpenAPI;
 
 /// <summary>Stands in for a feature's command: the type the validation attributes actually live on.</summary>
 public sealed record ProbeCommand

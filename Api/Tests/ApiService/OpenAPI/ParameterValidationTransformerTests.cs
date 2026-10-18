@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi;
 
-namespace Tests.ApiService;
+namespace Tests.ApiService.OpenAPI;
 
 /// <summary>
 /// The framework enforces a validation attribute on a minimal-API parameter at runtime but leaves it out of the

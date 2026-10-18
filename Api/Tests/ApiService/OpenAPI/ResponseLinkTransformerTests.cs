@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi;
 
-namespace Tests.ApiService;
+namespace Tests.ApiService.OpenAPI;
 
 /// <summary>
 /// A link is the only part of the document that describes a sequence, and the only thing Schemathesis's stateful

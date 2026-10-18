@@ -4,7 +4,7 @@ using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry.Logs;
 
-namespace Tests.ApiService;
+namespace Tests.ApiService.Infrastructure;
 
 /// <summary>Locks the classified-logging path used before console/journal and OTLP export (ADR-A009).</summary>
 public class TelemetryRedactionTests

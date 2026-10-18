@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Tests.ApiService;
+namespace Tests.ApiService.Infrastructure.ExceptionHandlers;
 
 /// <summary>
 /// Pins the machine-readable additions <see cref="AppExceptionHandler"/> writes for a multilingual client:

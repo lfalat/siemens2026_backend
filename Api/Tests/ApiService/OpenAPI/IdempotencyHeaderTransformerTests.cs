@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 
-namespace Tests.ApiService;
+namespace Tests.ApiService.OpenAPI;
 
 /// <summary>
 /// Tests that <see cref="IdempotencyHeaderTransformer"/> documents the idempotency contract on exactly the
