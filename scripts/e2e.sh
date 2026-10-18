@@ -7,7 +7,7 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-project="$root/tests/e2e"
+project="$root/Tests/e2e"
 handover="$root/e2e-users.json"
 roles=(Admin Recruiter HiringManager)
 base_url=${E2E__BaseUrl:-http://localhost:5173}

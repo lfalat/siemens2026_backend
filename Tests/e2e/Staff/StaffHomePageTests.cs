@@ -4,7 +4,7 @@ using E2E.Infrastructure;
 namespace E2E.Staff;
 
 /// <summary>The staff area: Entra sign-in, MSAL, and the API accepting the token (<c>GET /api/v1/me</c>).</summary>
-public class StaffHomePageTests(StaffSession session) : StaffTest(session)
+public class StaffHomePageTests : StaffTest
 {
     [Theory]
     [InlineData(StaffRole.Recruiter)]

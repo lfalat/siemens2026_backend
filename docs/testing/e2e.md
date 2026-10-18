@@ -1,6 +1,6 @@
 # End-to-End Tests
 
-Browser tests of the whole application with Playwright for .NET ([ADR-019](../architecture/ADR.md#adr-019-end-to-end-testing--playwright)): the React frontend, Entra ID sign-in, and the API behind it. They live in `tests/e2e/` (project `E2E.csproj`, in `healthyhires.slnx`) and run on xUnit v3, like the backend tests.
+Browser tests of the whole application with Playwright for .NET ([ADR-019](../architecture/ADR.md#adr-019-end-to-end-testing--playwright)): the React frontend, Entra ID sign-in, and the API behind it. They live in `Tests/e2e/` (project `E2E.csproj`, in `healthyhires.slnx`) and run on xUnit v3, like the backend tests.
 
 The tests start nothing themselves. They drive a browser against a stack that is already running, so they test what a person would see.
 
@@ -32,7 +32,7 @@ The secret key is shown only while an authenticator is being registered, on the 
 4. Add the same key to any authenticator app (it can be the phone's existing one) and enter its current code to finish.
 5. Make **Authenticator app or hardware token – code** the default sign-in method. The tests can switch away from a push notification, but a code as the default is one step less to break.
 
-The first person to have the users runs `just e2e-setup` without a file and types them in. They land in that person's .NET user secrets for `tests/e2e`, as `E2E:Users:<role>:Username`, `:Password` and `:TotpSecret`, outside the repository. Environment variables override them (`E2E__Users__Admin__Username`, …), which is how CI would pass them. Only the roles a run uses are needed: the applicant tests run without any user, and a staff test whose role has no user fails with *E2E:Users:&lt;role&gt;:Username is not set*.
+The first person to have the users runs `just e2e-setup` without a file and types them in. They land in that person's .NET user secrets for `Tests/e2e`, as `E2E:Users:<role>:Username`, `:Password` and `:TotpSecret`, outside the repository. Environment variables override them (`E2E__Users__Admin__Username`, …), which is how CI would pass them. Only the roles a run uses are needed: the applicant tests run without any user, and a staff test whose role has no user fails with *E2E:Users:&lt;role&gt;:Username is not set*.
 
 ## 2. Running
 
@@ -80,16 +80,24 @@ A failed sign-in is not retried: every test of that role reports the same error.
 Tests are grouped by who uses the page, in folders that mirror the frontend's route trees:
 
 ```text
-tests/e2e/
+Tests/e2e/
 ├─ Infrastructure/      E2ESettings and StaffRole, Entra (Microsoft's sign-in pages), StaffSession, the base classes
 ├─ Applicants/          Public pages; no sign-in
 └─ Staff/               Pages under /staff; signed in as the test user
 ```
 
-An applicant test derives from `E2EPageTest` and uses its `Page`. A staff test derives from `StaffTest`, takes the session in its constructor, and asks for a page per role with `SignInAsAsync`:
+An applicant test derives from `E2EPageTest` and uses its `Page`. A staff test derives from `StaffTest` and asks for a page by saying who it wants to be. Signing in is handled for it; a test never deals with Entra, tokens or sessions.
+
+| The test needs | Call | Notes |
+| --- | --- | --- |
+| A signed-in staff member | `await SignInAsAsync(StaffRole.Recruiter)` | The usual choice. Quick: each role signs in once per run, and every page reuses it |
+| A signed-out visitor | `await SignedOutPageAsync()` | E.g. to check that the staff area asks for a sign-in |
+| To click *Sign out* | `await SignInSeparatelyAsAsync(StaffRole.Recruiter)`, then after the click `await FinishSignOutAsync(page, StaffRole.Recruiter)` | Only for sign-out. A full Entra sign-in of its own, so slower; signing out of the shared one would break the other tests |
+
+Each call opens a new page in its own browser context, so one test can call it more than once, e.g. `SignInAsAsync(StaffRole.Admin)` and `SignInAsAsync(StaffRole.Recruiter)`, and check that only one of them can act.
 
 ```csharp
-public class StaffHomePageTests(StaffSession session) : StaffTest(session)
+public class StaffHomePageTests : StaffTest
 {
     [Theory]
     [InlineData(StaffRole.Recruiter)]
@@ -106,7 +114,7 @@ public class StaffHomePageTests(StaffSession session) : StaffTest(session)
 }
 ```
 
-A test about permissions can open two pages, e.g. `SignInAsAsync(StaffRole.Admin)` and `SignInAsAsync(StaffRole.Recruiter)`, and check that only one of them can act.
+`SignInOutTests` shows the other two in use.
 
 - **Navigate with relative paths** (`/staff`); the base URL comes from `E2E:BaseUrl`.
 - **Find elements the way a user does:** `GetByRole`, `GetByLabel`, `GetByText`. Avoid CSS classes, which change with styling.
