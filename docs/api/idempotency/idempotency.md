@@ -47,6 +47,34 @@ OpenAPI document does not declare, and the Schemathesis run would flag it
 > (`UseExceptionHandler`). Those sit outside this middleware, so their responses are never cached. Only
 > responses an endpoint *returns* (normal `IResult`s) are captured, and of those only 2xx.
 
+## In the frontend
+
+The SPA sends commands through `useCommand` (`App/src/shared/api/useCommand.ts`), a TanStack Query mutation that
+owns the key:
+
+```ts
+const createJobPost = useCommand((body: CreateJobPostBody, idempotencyKey) =>
+  request<JobPost>('/api/v1/recruitment/job-posts', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    idempotencyKey,
+  }),
+)
+```
+
+- **One key per user action, not per attempt.** The key is a fresh `crypto.randomUUID()` for new variables, reused
+  while the same variables are sent again, and dropped on success. A key minted per `fetch` would make every retry
+  look like a new command.
+- **The user's own retry counts too.** Submitting again after an error, with unchanged values, reuses the key, so a
+  first attempt whose answer was lost is replayed rather than run twice. Changed values get a new key; the old one
+  would be answered `422`.
+- **Automatic retries are limited to failures with no usable answer:** no response at all (`NetworkError`), `503`
+  and `504`, up to three times. Other errors are left to the user.
+
+`request` sends `idempotencyKey` as the `Idempotency-Key` header. The generated client (ADR-F005) will replace
+`request`, but the key still has to come from the caller, because only the caller knows where one action ends.
+
 ## Defaults
 
 - **Header:** `Idempotency-Key` (request), `Idempotency-Replayed` (response, on a replay).
