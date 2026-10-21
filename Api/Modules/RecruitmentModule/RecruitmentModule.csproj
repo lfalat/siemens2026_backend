@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Kernel\Kernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Staff accounts are created in Entra through Microsoft Graph (Infrastructure/Entra). -->
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Microsoft.Graph" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tests" />
+  </ItemGroup>
+
+</Project>

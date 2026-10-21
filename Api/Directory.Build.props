@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinning>true</CentralPackageTransitivePinning>
+
+    <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Logging rules are promoted to errors: the whole codebase logs through [LoggerMessage], and the
+         three ways out of that (a direct LogX call, a template that varies between calls, an argument
+         evaluated before the level check) each bypass both the performance and the redaction guarantees.
+         An interpolated template is the worst of them — it is a formed string by the time the pipeline
+         sees it, so there is nothing left to classify. See development-architecture.md §1.1. -->
+    <WarningsAsErrors>$(WarningsAsErrors);CA1848;CA2254;CA1873</WarningsAsErrors>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <RestoreEnablePackagePruning>true</RestoreEnablePackagePruning>
+  </PropertyGroup>
+</Project>
