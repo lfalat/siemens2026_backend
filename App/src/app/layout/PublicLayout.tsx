@@ -10,18 +10,18 @@ export function PublicLayout() {
     <AppShell
       homeTo="/"
       actions={
-        // A link styled as a button: it navigates to the staff area, which starts the Entra sign-in.
+        // A link styled as a button: it opens the public sign-in page.
         <Button
           as="a"
-          href="/staff"
+          href="/login"
           appearance="primary"
           icon={<PersonRegular />}
           onClick={(event) => {
             event.preventDefault()
-            void navigate('/staff')
+            void navigate('/login')
           }}
         >
-          Staff sign in
+          Sign in
         </Button>
       }
     />
