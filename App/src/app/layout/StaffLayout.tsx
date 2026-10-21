@@ -16,6 +16,9 @@ const useStyles = makeStyles({
     backgroundColor: '#F1F3F5',
   },
   header: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 1,
     display: 'flex',
     alignItems: 'center',
     minHeight: '72px',
@@ -36,6 +39,7 @@ const useStyles = makeStyles({
     boxSizing: 'border-box',
     padding: '28px 16px',
     backgroundColor: '#1F2933',
+    borderTop: '4px solid #9CA3AF',
     overflowY: 'auto',
   },
   navigation: {
