@@ -225,7 +225,13 @@ gh secret set NETBIRD_SETUP_KEY --repo <owner>/healthyhires --env production
 just azure-db-grant
 ```
 
-It opens an SSH tunnel to PostgreSQL through the VM, signs in with your Entra token, creates the group role `healthyhires_app` and the login role for the VM's managed identity, and drops login roles of earlier VMs. The API never has a password.
+It opens an SSH tunnel to PostgreSQL through the VM, signs in with your Entra token, creates the group role `healthyhires_app` and the login role for the VM's managed identity, creates the schemas listed in `infra/db-schemas.txt`, and drops login roles of earlier VMs. The API never has a password.
+
+```bash
+just azure-db-schema
+```
+
+It creates the tables, functions and triggers from `configs/postgres/init/01-create-db.sql`, the same script the local AppHost loads ([ADR-D005](../db/decision-log.md#adr-d005--the-ddl-script-is-applied-to-azure-once-as-the-baseline)), owned by `healthyhires_app` and in one transaction. The development seed (`02-seed-data.sql`) is never loaded. It runs **once per new database**: it refuses a database that already has tables, so it is safe to run by mistake, but it cannot apply a later schema change (§10.1).
 
 ```bash
 just azure-graph-grant
@@ -286,6 +292,7 @@ In the portal, *Application Insights → Logs*: `AppRequests | take 10` shows AP
 | Quadlets, Collector or Falco config (`deploy/`) | Push to `main`, like code |
 | `infra/cloud-init.yaml` or `deploy/host/` | Needs a rebuilt VM (§10.2): Azure does not let custom data change |
 | A new backend module with its own schema | Add the schema to `infra/db-schemas.txt`, run `just azure-db-grant`, then push. The API cannot create schemas itself |
+| A schema change (table, column, index) after the first deploy | Not automated yet: `just azure-db-schema` only creates an empty database's baseline. Apply the change by hand through the same tunnel until migrations exist ([ADR-D005](../db/decision-log.md#adr-d005--the-ddl-script-is-applied-to-azure-once-as-the-baseline)) |
 | Accept a Trivy or ZAP finding | Only with a reason: `.trivyignore` or `.zap/rules.tsv`. Prefer fixing it |
 
 ### 10.2 Rebuilding the VM
@@ -296,7 +303,7 @@ The VM holds no business data, so it is replaced rather than repaired ([infrastr
 az vm delete --resource-group rg-healthyhires-prod --name vm-healthyhires-prod --yes
 ```
 
-Remove the old peer in the NetBird dashboard, then repeat §6 (`just azure-deploy`), §7 (including `just azure-breakglass`), §8 (`just azure-github`), §9.1 and a deploy (`gh workflow run deploy`). The new VM has a new managed identity, which is why both grants have to run again.
+Remove the old peer in the NetBird dashboard, then repeat §6 (`just azure-deploy`), §7 (including `just azure-breakglass`), §8 (`just azure-github`), §9.1 and a deploy (`gh workflow run deploy`). The new VM has a new managed identity, which is why both grants have to run again. `just azure-db-schema` does not: the database, and its tables, survive the rebuild.
 
 ### 10.3 Pausing Between Demos
 
@@ -399,7 +406,7 @@ Edit `infra/azure.env` for the new subscription: `HH_SUBSCRIPTION_ID`, and `HH_O
 
 ### 11.5 Import and deploy
 
-Import **before** the first deploy, so the API starts against the restored schema:
+Import **before** the first deploy, so the API starts against the restored schema. The dump carries the tables, so skip `just azure-db-schema` here; it would refuse the restored database anyway:
 
 ```bash
 scripts/azure/migrate.sh import ./migration

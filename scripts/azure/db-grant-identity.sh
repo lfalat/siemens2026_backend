@@ -16,19 +16,9 @@ source "$(dirname "$0")/lib.sh"
 load_env
 need psql ssh
 
-pg_host=$(output postgresHost)
 principal=$(output vmPrincipalId)
 role="hh-api-${principal:0:8}"
-vm_host=${HH_VM_SSH_HOST:-$(run_on_vm 'netbird status --json | jq -r .netbirdIp' | cut -d/ -f1 | tr -d '[:space:]')}
-port=${HH_TUNNEL_PORT:-6432}
-
-log "Opening a tunnel to $pg_host through azureops@$vm_host"
-ssh -f -N -o ExitOnForwardFailure=yes -L "$port:$pg_host:5432" "azureops@$vm_host"
-trap 'pkill -f "ssh -f -N -o ExitOnForwardFailure=yes -L $port:$pg_host:5432" || true' EXIT
-sleep 1
-
-PGPASSWORD=$(az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv)
-export PGPASSWORD PGSSLMODE=require
+open_pg_tunnel
 
 admin() { psql "host=localhost port=$port user=$HH_OPERATOR_UPN dbname=$1" -v ON_ERROR_STOP=1 -q "${@:2}"; }
 

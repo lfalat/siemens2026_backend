@@ -71,3 +71,25 @@ staff table to reference.
 - A recruiter who later loses the role or is deleted in Entra stays on the job post. Noticing that would need Entra
   change notifications, which nothing needs yet.
 - `created_by` and `updated_by` hold Entra object ids for the same reason, as every staff reference will.
+
+---
+
+## ADR-D005 — The DDL script is applied to Azure once, as the baseline
+
+**Date:** 2026-10-21 · **Status:** accepted · **Follows up:** ADR-D002
+
+`scripts/azure/db-schema.sh` (`just azure-db-schema`) creates the tables in a new Azure database from
+`configs/postgres/init/01-create-db.sql`, the script the AppHost loads locally. Until now nothing created them in
+Azure: `db-grant-identity.sh` made the roles and schemas, the EF contexts map their tables with `ExcludeFromMigrations`,
+and the deploy workflow touches no schema.
+
+- It runs as the operator acting as `healthyhires_app`, in one transaction, so every object belongs to the application
+  role, like the schemas. The `CREATE SCHEMA` lines are skipped: the role may not create schemas, even with
+  `IF NOT EXISTS`, and the script checks that `infra/db-schemas.txt` lists every schema the DDL creates.
+- `kernel` joined `infra/db-schemas.txt`; without it `kernel.idempotency` had no schema in Azure.
+- Only `01-create-db.sql`: the development seed never reaches Azure.
+- It refuses a database that already has tables, because the DDL is not re-runnable. From the first deployment on, the
+  script is the baseline ADR-D002 anticipated, and a schema change needs a migration. How migrations are written and
+  applied is still open; numbered SQL files applied through the same tunnel fit the SQL-first approach best. Until
+  then a change is applied by hand, and the DDL script is updated in the same pull request.
+

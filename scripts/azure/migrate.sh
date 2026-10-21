@@ -20,16 +20,8 @@ dir=${2:-}
 load_env
 need pg_dump pg_restore ssh
 
-pg_host=$(output postgresHost)
 account=$(output storageAccountName)
-vm_host=${HH_VM_SSH_HOST:-$(run_on_vm 'netbird status --json | jq -r .netbirdIp' | cut -d/ -f1 | tr -d '[:space:]')}
-port=${HH_TUNNEL_PORT:-6432}
-
-ssh -f -N -o ExitOnForwardFailure=yes -L "$port:$pg_host:5432" "azureops@$vm_host"
-trap 'pkill -f "ssh -f -N -o ExitOnForwardFailure=yes -L $port:$pg_host:5432" || true' EXIT
-sleep 1
-PGPASSWORD=$(az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv)
-export PGPASSWORD PGSSLMODE=require
+open_pg_tunnel
 conn="host=localhost port=$port user=$HH_OPERATOR_UPN dbname=healthyhires"
 
 case $action in

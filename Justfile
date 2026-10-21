@@ -98,6 +98,10 @@ azure-breakglass:
 azure-db-grant:
   scripts/azure/db-grant-identity.sh
 
+# Creates the tables in a new Azure database from configs/postgres/init/01-create-db.sql; once, after azure-db-grant.
+azure-db-schema:
+  scripts/azure/db-schema.sh
+
 # Gives the VM's managed identity the Graph permissions for creating staff accounts; again after every VM rebuild.
 azure-graph-grant:
   scripts/azure/graph-grant-identity.sh

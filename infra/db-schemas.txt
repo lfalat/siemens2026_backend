@@ -1,7 +1,9 @@
-# One PostgreSQL schema per backend module (ADR-A001), created by scripts/azure/db-grant-identity.sh and owned by
-# the healthyhires_app role. The API cannot create schemas itself (iam.md §4.2), so a new module adds its schema
-# here and the grant script runs again before the first deploy that uses it. Each module's DbContext keeps its
-# EF Core migrations history table in its own schema.
+# The PostgreSQL schemas: one per backend module (ADR-A001), plus the host-owned kernel (ADR-D001). Created by
+# scripts/azure/db-grant-identity.sh and owned by the healthyhires_app role. The API cannot create schemas itself
+# (iam.md §4.2), so a new module adds its schema here and the grant script runs again before the first deploy that
+# uses it. scripts/azure/db-schema.sh checks that every schema 01-create-db.sql creates is listed here. Each module's
+# DbContext keeps its EF Core migrations history table in its own schema.
 #
 # One name per line, lowercase letters, digits and underscores.
+kernel
 recruitment

@@ -65,3 +65,22 @@ run_on_vm() {
         --command-id RunShellScript --scripts "$1" --query 'value[0].message' -o tsv \
         | awk '/^\[stdout\]/ { out = 1; next } /^\[stderr\]/ { out = 0 } out'
 }
+
+# Opens an SSH tunnel to Azure PostgreSQL through the VM over NetBird (the server has no public access) and signs psql
+# in with the operator's Entra token. Sets $port, the local end of the tunnel, and closes the tunnel when the script
+# exits. Needs this machine on NetBird.
+open_pg_tunnel() {
+    local pg_host vm_host
+    pg_host=$(output postgresHost)
+    vm_host=${HH_VM_SSH_HOST:-$(run_on_vm 'netbird status --json | jq -r .netbirdIp' | cut -d/ -f1 | tr -d '[:space:]')}
+    port=${HH_TUNNEL_PORT:-6432}
+
+    log "Opening a tunnel to $pg_host through azureops@$vm_host"
+    ssh -f -N -o ExitOnForwardFailure=yes -L "$port:$pg_host:5432" "azureops@$vm_host"
+    # shellcheck disable=SC2064  # expanded now on purpose: the trap must name this tunnel
+    trap "pkill -f 'ssh -f -N -o ExitOnForwardFailure=yes -L $port:$pg_host:5432' || true" EXIT
+    sleep 1
+
+    PGPASSWORD=$(az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv)
+    export PGPASSWORD PGSSLMODE=require
+}
