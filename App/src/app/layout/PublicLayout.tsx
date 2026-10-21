@@ -21,7 +21,7 @@ export function PublicLayout() {
             void navigate('/login')
           }}
         >
-          Sign in
+          Zamestnanecký vstup
         </Button>
       }
     />

@@ -1,5 +1,5 @@
-import { ApiError } from '../../shared/api/http.ts'
-import { useCurrentStaff } from '../../shared/auth/useCurrentStaff.ts'
+import { ApiError } from '../../../shared/api/http.ts'
+import { useCurrentStaff } from '../../../shared/auth/useCurrentStaff.ts'
 import { makeStyles } from '@fluentui/react-components'
 
 const useStyles = makeStyles({

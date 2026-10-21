@@ -48,7 +48,7 @@ const useStyles = makeStyles({
     gap: '20px',
   },
   salaryRow: {
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   },
   openingsRow: {
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -162,10 +162,16 @@ export function StaffJobsPage() {
           <div className={`${styles.row} ${styles.salaryRow}`}>
             <Field
               className={styles.field}
-              label={<span className={styles.label}>Výška mzdy</span>}
+              label={<span className={styles.label}>Výška mzdy (EUR)</span>}
               required
             >
-              <Input className={styles.input} placeholder="Napr. 1800 EUR" />
+              <Input
+                className={styles.input}
+                type="number"
+                min={0.01}
+                step={0.01}
+                placeholder="Kladné číslo s najviac 2 desatinnými miestami"
+              />
             </Field>
             <Field
               className={styles.field}

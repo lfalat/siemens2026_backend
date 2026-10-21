@@ -1,8 +1,8 @@
 import { MsalProvider } from '@azure/msal-react'
-import { createStaffAuth } from '../providers/createStaffAuth.ts'
-import { StaffAuthContext } from '../../shared/auth/StaffAuthContext.ts'
-import { RequireSignIn } from '../providers/RequireSignIn.tsx'
-import { StaffLayout } from '../layout/StaffLayout.tsx'
+import { createStaffAuth } from '../../providers/createStaffAuth.ts'
+import { StaffAuthContext } from '../../../shared/auth/StaffAuthContext.ts'
+import { RequireSignIn } from '../../providers/RequireSignIn.tsx'
+import { StaffLayout } from '../../layout/StaffLayout.tsx'
 
 /**
  * Builds the /staff route the first time it is visited: reads /config.json, starts MSAL and finishes a sign-in

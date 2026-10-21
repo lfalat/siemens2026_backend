@@ -1,7 +1,6 @@
-import { makeStyles, Text, tokens } from '@fluentui/react-components'
+import { makeStyles, tokens } from '@fluentui/react-components'
 import type { ReactNode } from 'react'
 import { Link, Outlet } from 'react-router'
-import { LogoMark } from './LogoMark.tsx'
 
 const useStyles = makeStyles({
   root: {
@@ -13,11 +12,11 @@ const useStyles = makeStyles({
   header: {
     position: 'sticky',
     top: 0,
-    zIndex: 1,
+    zIndex: 10,
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalL,
-    height: '64px',
+    height: '72px',
     boxSizing: 'border-box',
     paddingInline: tokens.spacingHorizontalXXL,
     backgroundColor: tokens.colorNeutralBackground1,
@@ -30,6 +29,11 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalS,
     color: tokens.colorNeutralForeground1,
     textDecoration: 'none',
+  },
+  logo: {
+    width: 'auto',
+    height: '20px',
+    objectFit: 'contain',
   },
   // Pushes the actions to the right edge.
   actions: {
@@ -54,10 +58,7 @@ export function AppShell({
     <div className={styles.root}>
       <header className={styles.header}>
         <Link to={homeTo} className={styles.brand}>
-          <LogoMark />
-          <Text size={500} weight="semibold">
-            Healthy Hires
-          </Text>
+          <img className={styles.logo} src="/hh_logo_small.png" alt="" />
         </Link>
         <div className={styles.actions}>{actions}</div>
       </header>
