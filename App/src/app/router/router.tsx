@@ -32,6 +32,13 @@ export const router = createBrowserRouter([
             Component: m.StaffAccessDeniedPage,
           })),
       },
+      {
+        path: 'jobs',
+        lazy: () =>
+          import('./StaffJobsPage.tsx').then((m) => ({
+            Component: m.StaffJobsPage,
+          })),
+      },
     ],
   },
   { path: '*', Component: NotFoundPage },
