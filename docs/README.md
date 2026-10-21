@@ -28,7 +28,7 @@ New to the docs? Start with the [Architecture Description Document](architecture
 
 - [First Module Tests](api/first-module-tests.md) — the tests that check every module endpoint, to be added with the first module.
 - [Implementation Guide](api/implementation-guide.md) — the modular monolith, how a module is laid out, how to create a module and a feature, validation, the decorator chain and the backend conventions.
-- [Error Model](api/errors/errors.md) — problem responses, the exception taxonomy, validation errors, error codes and how they reach the OpenAPI document.
+- [Error Model](api/errors/errors.md) — problem responses, the exception taxonomy, the Slovak error messages, validation errors and how error responses reach the OpenAPI document.
 - [Idempotency](api/idempotency/idempotency.md) — the `Idempotency-Key` contract, defaults, per-endpoint overrides, claim lifecycle and limitations.
 - [Scheduling](api/scheduling/scheduling.md) — daily and periodic background workers: writing, registering, behaviour and the current schedule.
 
