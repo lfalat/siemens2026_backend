@@ -8,12 +8,12 @@ using Microsoft.AspNetCore.Routing;
 
 namespace RecruitmentModule.Features.JobPostFeatures.CreateJobPost;
 
-/// <summary><c>POST /api/v1/recruitment/job-posts</c>: a staff member creates a job post.</summary>
+/// <summary><c>POST /api/v1/recruitment/job-posts</c>: a hiring manager creates a job post.</summary>
 internal sealed class CreateJobPostEndpoint : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder group) =>
         group.MapGroup("/job-posts")
-            .RequireStaff()
+            .RequireStaff(StaffPolicies.HiringManager)
             .MapPost("", static async (
                 CreateJobPostRequest request,
                 ClaimsPrincipal user,
@@ -25,10 +25,13 @@ internal sealed class CreateJobPostEndpoint : IEndpoint
                     Title = request.Title,
                     Location = request.Location,
                     Department = request.Department,
+                    Description = request.Description,
                     IsPublished = request.IsPublished,
                     OpenPositions = request.OpenPositions,
+                    Salary = request.Salary,
                     PaymentType = request.PaymentType,
                     EmploymentType = request.EmploymentType,
+                    RecruiterId = request.RecruiterId,
                     CreatedBy = user.GetStaffId(),
                 };
                 CreateJobPostResponse result = await handler.HandleAsync(command, ct);
@@ -38,6 +41,6 @@ internal sealed class CreateJobPostEndpoint : IEndpoint
             })
             .WithName("CreateJobPost")
             .Produces<CreateJobPostResponse>(StatusCodes.Status201Created)
-            .ProducesLink(StatusCodes.Status201Created, "AssignJobPostRecruiter",
-                ("jobPostId", "$response.body#/id"));
+            .ProducesProblem(StatusCodes.Status502BadGateway) // Entra refused the recruiter lookup
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 }

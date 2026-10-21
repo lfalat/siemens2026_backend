@@ -87,31 +87,35 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- job_post  (a position the company is hiring for)
--- `is_published = false` is a draft (koncept), seen by staff only.
+-- Created by a hiring manager. `is_published = false` is a draft (koncept), seen by staff only.
 --
 -- `recruiter_id` is the Entra object id (`oid`) of the staff member with the Recruiter role who is responsible
--- for the hiring (zodpovedný za realizáciu náboru). Staff accounts live in Entra, not in this database, so it is
--- a logical reference with no foreign key (ADR-D004); the application checks the role on write. `NULL` until a
--- hiring manager assigns one.
+-- for the hiring (zodpovedný za realizáciu náboru), chosen by the hiring manager who creates the post. Staff
+-- accounts live in Entra, not in this database, so it is a logical reference with no foreign key (ADR-D004); the
+-- application checks the role on write.
 CREATE TABLE recruitment.job_post (
-    id               UUID         PRIMARY KEY DEFAULT uuidv7(),
-    title            TEXT         NOT NULL,
-    location         TEXT         NOT NULL,
-    department       TEXT         NOT NULL,
-    is_published     BOOLEAN      NOT NULL DEFAULT false,
-    open_positions   INTEGER      NOT NULL,
-    payment_type     TEXT         NOT NULL,  -- hourly / monthly wage
-    employment_type  TEXT         NOT NULL,  -- TPP, part-time, work agreements, ...
-    recruiter_id     UUID,                   -- Entra oid of the responsible recruiter; logical, no FK
-    created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    created_by       UUID         NOT NULL,
+    id               UUID           PRIMARY KEY DEFAULT uuidv7(),
+    title            TEXT           NOT NULL,
+    location         TEXT           NOT NULL,
+    department       TEXT           NOT NULL,
+    description      TEXT           NOT NULL,
+    is_published     BOOLEAN        NOT NULL DEFAULT false,
+    open_positions   INTEGER        NOT NULL,
+    salary           NUMERIC(10, 2) NOT NULL,  -- EUR, per `payment_type`
+    payment_type     TEXT           NOT NULL,  -- hourly / monthly wage
+    employment_type  TEXT           NOT NULL,  -- TPP, part-time, work agreements, ...
+    recruiter_id     UUID           NOT NULL,  -- Entra oid of the responsible recruiter; logical, no FK
+    created_at       TIMESTAMPTZ    NOT NULL DEFAULT now(),
+    created_by       UUID           NOT NULL,
     updated_at       TIMESTAMPTZ,
     updated_by       UUID,
-    version          SMALLINT     NOT NULL DEFAULT 1,
+    version          SMALLINT       NOT NULL DEFAULT 1,
     CONSTRAINT job_post_title_valid CHECK (btrim(title) <> ''),
     CONSTRAINT job_post_location_valid CHECK (btrim(location) <> ''),
     CONSTRAINT job_post_department_valid CHECK (btrim(department) <> ''),
+    CONSTRAINT job_post_description_valid CHECK (btrim(description) <> ''),
     CONSTRAINT job_post_open_positions_valid CHECK (open_positions > 0),
+    CONSTRAINT job_post_salary_valid CHECK (salary > 0),
     CONSTRAINT job_post_payment_type_valid CHECK (payment_type IN ('hourly', 'monthly')),
     CONSTRAINT job_post_employment_type_valid CHECK (employment_type IN (
         'full_time', 'part_time', 'fixed_term', 'work_performance_agreement', 'work_activity_agreement',

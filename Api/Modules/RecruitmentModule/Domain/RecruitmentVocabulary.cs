@@ -13,11 +13,8 @@ public static class ModuleEvents
     /// <summary>An administrator created a staff account in Entra.</summary>
     public const string StaffUserCreated = "staff_user_created";
 
-    /// <summary>A staff member created a job post.</summary>
+    /// <summary>A hiring manager created a job post.</summary>
     public const string JobPostCreated = "job_post_created";
-
-    /// <summary>A hiring manager assigned the recruiter responsible for a job post.</summary>
-    public const string JobPostRecruiterAssigned = "job_post_recruiter_assigned";
 }
 
 /// <summary>How a job post's wage is stated (<c>job_post.payment_type</c>).</summary>

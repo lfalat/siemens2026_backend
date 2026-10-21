@@ -15,6 +15,10 @@ public sealed record CreateJobPostRequest
     /// <example>Údržba</example>
     public string Department { get; init; } = string.Empty;
 
+    /// <summary>What the job is, as applicants will read it.</summary>
+    /// <example>Údržba a opravy elektrických zariadení vo výrobnej hale.</example>
+    public string Description { get; init; } = string.Empty;
+
     /// <summary>Whether applicants can see the post; <c>false</c> keeps it a draft (koncept).</summary>
     /// <example>false</example>
     public bool IsPublished { get; init; }
@@ -22,6 +26,10 @@ public sealed record CreateJobPostRequest
     /// <summary>How many people are hired for the position.</summary>
     /// <example>2</example>
     public int OpenPositions { get; init; }
+
+    /// <summary>The wage in EUR, per hour or per month as <c>paymentType</c> says; at most 2 decimal places.</summary>
+    /// <example>1800.00</example>
+    public decimal Salary { get; init; }
 
     /// <summary>How the wage is stated: <c>hourly</c> (hodinová mzda) or <c>monthly</c> (mesačná mzda).</summary>
     /// <example>monthly</example>
@@ -34,4 +42,11 @@ public sealed record CreateJobPostRequest
     /// </summary>
     /// <example>full_time</example>
     public string EmploymentType { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The Entra object id of a staff member with the <c>Recruiter</c> role, who becomes responsible for the hiring
+    /// (zodpovedný za realizáciu náboru). Listed by <c>GET /staff-users?role=Recruiter</c>.
+    /// </summary>
+    /// <example>6f1c1f0e-2d0a-4a43-9a3b-1b8f8b7a2f10</example>
+    public Guid RecruiterId { get; init; }
 }

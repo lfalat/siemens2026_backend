@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Routing;
 
 namespace RecruitmentModule.Features.StaffManagementFeatures.ListStaffUsers;
 
-/// <summary><c>GET /api/v1/recruitment/staff-users</c>: the staff, e.g. the recruiters a job post can be assigned.</summary>
+/// <summary><c>GET /api/v1/recruitment/staff-users</c>: the staff, e.g. the recruiters to choose from for a job post.</summary>
 internal sealed class ListStaffUsersEndpoint : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder group) =>

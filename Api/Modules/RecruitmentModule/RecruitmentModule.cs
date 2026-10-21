@@ -39,8 +39,13 @@ public static class RecruitmentModule
                 $"{StaffDirectoryOptions.SectionName}:ApiClientId and {StaffDirectoryOptions.SectionName}:UserDomain must be set outside Development.")
             .ValidateOnStart();
 
-        // The VM's managed identity in production, the developer's Azure CLI sign-in locally (iam.md §4, §8).
-        services.AddSingleton(static _ => new GraphServiceClient(new DefaultAzureCredential()));
+        // The VM's managed identity in production, the developer's Azure CLI sign-in locally (iam.md §4, §8). Locally the
+        // CLI is asked directly: DefaultAzureCredential tries the managed identity first, whose metadata endpoint does
+        // not exist off Azure and can hang until the request is cancelled instead of failing over.
+        services.AddSingleton(static sp => new GraphServiceClient(
+            sp.GetRequiredService<IHostEnvironment>().IsDevelopment()
+                ? new AzureCliCredential()
+                : new DefaultAzureCredential()));
         services.AddScoped<IStaffDirectory, GraphStaffDirectory>();
 
         return services;

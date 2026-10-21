@@ -16,8 +16,10 @@ internal sealed class JobPostConfiguration : IEntityTypeConfiguration<JobPost>
         b.Property(p => p.Title).HasColumnName("title");
         b.Property(p => p.Location).HasColumnName("location");
         b.Property(p => p.Department).HasColumnName("department");
+        b.Property(p => p.Description).HasColumnName("description");
         b.Property(p => p.IsPublished).HasColumnName("is_published");
         b.Property(p => p.OpenPositions).HasColumnName("open_positions");
+        b.Property(p => p.Salary).HasColumnName("salary").HasPrecision(10, 2);
         b.Property(p => p.PaymentType).HasColumnName("payment_type");
         b.Property(p => p.EmploymentType).HasColumnName("employment_type");
         b.Property(p => p.RecruiterId).HasColumnName("recruiter_id");

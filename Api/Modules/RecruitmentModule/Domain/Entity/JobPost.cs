@@ -11,10 +11,15 @@ public sealed class JobPost
 
     public string Department { get; set; } = string.Empty;
 
+    public string Description { get; set; } = string.Empty;
+
     /// <summary><c>false</c> while the post is a draft (<i>koncept</i>), seen by staff only.</summary>
     public bool IsPublished { get; set; }
 
     public int OpenPositions { get; set; }
+
+    /// <summary>The wage in EUR, per hour or per month as <see cref="PaymentType"/> says.</summary>
+    public decimal Salary { get; set; }
 
     /// <summary>One of <see cref="PaymentTypes"/>.</summary>
     public string PaymentType { get; set; } = string.Empty;
@@ -23,10 +28,10 @@ public sealed class JobPost
     public string EmploymentType { get; set; } = string.Empty;
 
     /// <summary>
-    /// The Entra object id of the recruiter responsible for the hiring (<i>zodpovedný za realizáciu náboru</i>);
-    /// <c>null</c> until a hiring manager assigns one. A logical reference: staff accounts live in Entra.
+    /// The Entra object id of the recruiter responsible for the hiring (<i>zodpovedný za realizáciu náboru</i>),
+    /// chosen by the hiring manager who created the post. A logical reference: staff accounts live in Entra.
     /// </summary>
-    public Guid? RecruiterId { get; set; }
+    public Guid RecruiterId { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 

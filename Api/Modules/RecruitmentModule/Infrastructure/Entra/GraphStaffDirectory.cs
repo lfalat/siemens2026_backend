@@ -131,7 +131,11 @@ internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<Sta
     /// <summary>The API registration's enterprise application, which defines the app roles and holds their assignments.</summary>
     private async Task<ServicePrincipal> ApiServicePrincipalAsync(CancellationToken ct)
     {
-        string apiClientId = Configured().ApiClientId!;
+        // Only the API registration: listing the staff needs no UserDomain, which only account creation uses.
+        string apiClientId = Guid.TryParse(options.Value.ApiClientId, out _)
+            ? options.Value.ApiClientId!
+            : throw new InvalidOperationException(
+                $"{StaffDirectoryOptions.SectionName}:ApiClientId must be set to read the staff and their roles.");
         return await CallAsync("načítať podnikovú aplikáciu API", () =>
                 graph.ServicePrincipalsWithAppId(apiClientId).GetAsync(r => r.QueryParameters.Select = ["id", "appRoles"], ct), ct)
             ?? throw new InvalidOperationException($"The tenant has no enterprise application for the API registration {apiClientId}.");

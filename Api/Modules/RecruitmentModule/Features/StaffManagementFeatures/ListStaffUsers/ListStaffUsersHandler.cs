@@ -17,7 +17,7 @@ public sealed record ListStaffUsersQuery
 public sealed record ListStaffUsersResponse(IReadOnlyList<StaffUserItem> Users);
 
 /// <summary>One staff member.</summary>
-/// <param name="Id">The Entra object id (<c>oid</c>), e.g. the value to assign as a job post's recruiter.</param>
+/// <param name="Id">The Entra object id (<c>oid</c>), e.g. a job post's <c>recruiterId</c>.</param>
 /// <param name="DisplayName">The name shown in Entra.</param>
 /// <param name="Roles">The assigned app roles; one, unless Entra was given more.</param>
 public sealed record StaffUserItem(Guid Id, string DisplayName, IReadOnlyList<string> Roles);

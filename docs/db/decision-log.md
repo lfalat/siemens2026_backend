@@ -66,8 +66,8 @@ The [audit trigger](conventions.md#audit-trigger-the-version--updated_at-rule) f
 and their app roles live only in Entra ([iam.md §2.4](../architecture/iam.md#24-session-management)); there is no
 staff table to reference.
 
-- There is no foreign key and no role constraint. The assigning handler asks the directory (Microsoft Graph) that the
-  user holds the `Recruiter` role at the time of assignment.
-- A recruiter who later loses the role or is deleted in Entra stays on the job post until a hiring manager assigns
-  someone else. Reacting to that would need Entra change notifications, which nothing needs yet.
+- There is no foreign key and no role constraint. The handler creating the job post asks the directory (Microsoft Graph)
+  that the user holds the `Recruiter` role at that moment.
+- A recruiter who later loses the role or is deleted in Entra stays on the job post. Noticing that would need Entra
+  change notifications, which nothing needs yet.
 - `created_by` and `updated_by` hold Entra object ids for the same reason, as every staff reference will.

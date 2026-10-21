@@ -23,7 +23,7 @@ so `scripts/azure/db-grant-identity.sh` creates it in Azure.
 
 ## `job_post`
 
-> One job post. `is_published = false` is a draft (*koncept*), seen by staff only.
+> One job post, created by a hiring manager. `is_published = false` is a draft (*koncept*), seen by staff only.
 
 **Audit:** standard · **Soft delete:** no
 
@@ -35,11 +35,13 @@ so `scripts/azure/db-grant-identity.sh` creates it in Azure.
 | `title` | `TEXT` |  | NO |  | The position's title |
 | `location` | `TEXT` |  | NO |  | Where the work is done |
 | `department` | `TEXT` |  | NO |  | The department the position belongs to |
+| `description` | `TEXT` |  | NO |  | What the job is, as applicants read it |
 | `is_published` | `BOOLEAN` |  | NO | `false` | `false` = draft (*koncept*), `true` = visible to applicants |
 | `open_positions` | `INTEGER` |  | NO |  | How many people are hired for the position |
+| `salary` | `NUMERIC(10,2)` |  | NO |  | The wage in EUR, per hour or per month as `payment_type` says |
 | `payment_type` | `TEXT` |  | NO |  | How the wage is stated — see CHECK |
 | `employment_type` | `TEXT` |  | NO |  | The form of employment (*typ úväzku*) — see CHECK |
-| `recruiter_id` | `UUID` | LFK | YES |  | Entra object id of the staff member with the `Recruiter` role responsible for the hiring (*zodpovedný za realizáciu náboru*); `NULL` until a hiring manager assigns one |
+| `recruiter_id` | `UUID` | LFK | NO |  | Entra object id of the staff member with the `Recruiter` role responsible for the hiring (*zodpovedný za realizáciu náboru*), chosen by the hiring manager who creates the post |
 
 **Value sets**
 
@@ -70,7 +72,9 @@ The application's copies are `PaymentTypes` and `EmploymentTypes` in `Recruitmen
 | `job_post_title_valid` | CHECK | `btrim(title) <> ''` | No blank title |
 | `job_post_location_valid` | CHECK | `btrim(location) <> ''` | No blank location |
 | `job_post_department_valid` | CHECK | `btrim(department) <> ''` | No blank department |
+| `job_post_description_valid` | CHECK | `btrim(description) <> ''` | No blank description |
 | `job_post_open_positions_valid` | CHECK | `open_positions > 0` | At least one position to fill |
+| `job_post_salary_valid` | CHECK | `salary > 0` | A wage is always offered |
 | `job_post_payment_type_valid` | CHECK | `payment_type IN ('hourly','monthly')` | Guards the value set |
 | `job_post_employment_type_valid` | CHECK | `employment_type IN ('full_time','part_time','fixed_term','work_performance_agreement','work_activity_agreement','student_work_agreement','self_employed')` | Guards the value set |
 
@@ -89,10 +93,11 @@ The application's copies are `PaymentTypes` and `EmploymentTypes` in `Recruitmen
 
 **Notes**
 
-- **Who writes what.** Any staff member creates a job post (`POST /job-posts`), always without a recruiter. Only a
-  hiring manager (or an administrator) assigns the recruiter (`PUT /job-posts/{id}/recruiter`), choosing from
-  `GET /staff-users?role=Recruiter`. Several users edit a row, so it keeps `updated_by`.
-- **Lengths are the application's.** The commands cap `title`, `location` and `department` at 200 characters and
-  `open_positions` at 1000; the table only guards what must never be stored (blank text, no positions).
+- **Who writes what.** Only a hiring manager (or an administrator) creates a job post (`POST /job-posts`), and names
+  its recruiter in the same request, choosing from `GET /staff-users?role=Recruiter`. No feature edits a post yet;
+  the table keeps `updated_by` for the editing features to come, which several users will use.
+- **Lengths are the application's.** The command caps `title`, `location` and `department` at 200 characters,
+  `description` at 10 000 and `open_positions` at 1000; the table only guards what must never be stored (blank
+  text, no positions, no wage). `salary` fits `NUMERIC(10,2)`: at most 99 999 999.99, with 2 decimal places.
 - **No title search index yet.** The [search-index convention](../conventions.md#search-indexes) calls for a trigram
   GIN index on a searched title; it is added with the first feature that searches job posts.
