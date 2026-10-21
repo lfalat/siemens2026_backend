@@ -1,3 +1,4 @@
+using Kernel.Errors;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
@@ -56,8 +57,7 @@ internal sealed partial class UnstorableTextExceptionHandler(
                 Status = StatusCodes.Status400BadRequest,
                 // Deliberately does not echo the value back: it is caller-supplied and, by definition here,
                 // contains bytes that do not belong in a log or a response.
-                Detail = "A text value in the request contains a character that cannot be stored "
-                         + "(most often a NUL). Remove it and retry.",
+                Detail = ErrorMessages.UnstorableText,
             },
         });
     }

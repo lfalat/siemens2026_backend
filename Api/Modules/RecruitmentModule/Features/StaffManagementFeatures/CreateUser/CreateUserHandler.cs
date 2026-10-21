@@ -25,7 +25,7 @@ public sealed record CreateUserCommand : ICommand
     /// </summary>
     [Required, StringLength(64)]
     [RegularExpression("^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$",
-        ErrorMessage = "Use letters, digits, '.', '_' and '-', starting and ending with a letter or digit.")]
+        ErrorMessage = "Použite písmená bez diakritiky, číslice, bodku, podčiarkovník alebo pomlčku; na začiatku a na konci musí byť písmeno alebo číslica.")]
     public string Username { get; init; } = string.Empty;
 }
 
@@ -49,10 +49,7 @@ internal sealed partial class CreateUserHandler(IStaffDirectory directory, ILogg
     public async Task<CreateUserResponse> HandleAsync(CreateUserCommand command, CancellationToken ct = default)
     {
         if (await directory.UserExistsAsync(command.Username, ct))
-            throw new ConflictException($"An account named '{command.Username}' already exists.")
-            {
-                Code = RecruitmentErrors.UsernameTaken,
-            };
+            throw new ConflictException($"Účet s používateľským menom „{command.Username}“ už existuje.");
 
         string password = TemporaryPassword.Generate();
         StaffAccount account = await directory.CreateUserAsync(command.DisplayName, command.Username, password, ct);

@@ -48,9 +48,9 @@ public class ValidationDecoratorTests
         Assert.Equal(0, inner.Calls);
         Assert.Contains(nameof(Sample.Email), ex.Errors.Keys);
         Assert.Contains(nameof(Sample.Rating), ex.Errors.Keys);
-        // Each failure carries a stable, attribute-derived code the client translates on.
-        Assert.Equal(["email"], ex.ErrorCodeValues[nameof(Sample.Email)]);
-        Assert.Equal(["range"], ex.ErrorCodeValues[nameof(Sample.Rating)]);
+        // Each failure carries the Slovak message the frontend shows next to the field.
+        Assert.Equal(["Zadajte platnú e-mailovú adresu."], ex.Errors[nameof(Sample.Email)]);
+        Assert.Equal(["Hodnota musí byť aspoň 1 a najviac 5."], ex.Errors[nameof(Sample.Rating)]);
     }
 
     private sealed record Required : ICommand
@@ -62,7 +62,7 @@ public class ValidationDecoratorTests
     }
 
     [Fact]
-    public async Task A_failing_required_reports_the_required_code_alone()
+    public async Task A_failing_required_reports_that_alone()
     {
         StubHandler<Required, string> inner = new(_ => "ok");
         ValidationDecorator<Required, string> decorator = new(inner);
@@ -70,7 +70,7 @@ public class ValidationDecoratorTests
         Kernel.Exceptions.ValidationException ex = await Assert.ThrowsAsync<Kernel.Exceptions.ValidationException>(
             () => decorator.HandleAsync(new Required { Name = null! }, TestContext.Current.CancellationToken));
 
-        Assert.Equal(["required"], ex.ErrorCodeValues[nameof(Required.Name)]);
+        Assert.Equal(["Toto pole je povinné."], ex.Errors[nameof(Required.Name)]);
     }
 
     [Fact]

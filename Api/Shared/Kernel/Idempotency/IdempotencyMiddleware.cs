@@ -4,7 +4,6 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Kernel.Auth;
-using Kernel.Errors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
@@ -69,15 +68,15 @@ public sealed partial class IdempotencyMiddleware(
                 return;
             }
 
-            await WriteProblemAsync(context, CommonErrors.IdempotencyKeyMissing,
-                $"A non-empty '{_options.HeaderName}' header is required for {context.Request.Method} requests.");
+            await WriteProblemAsync(context, StatusCodes.Status400BadRequest,
+                $"Požiadavke chýba hlavička {_options.HeaderName}.");
             return;
         }
 
         if (key.Length > _options.MaxKeyLength)
         {
-            await WriteProblemAsync(context, CommonErrors.IdempotencyKeyTooLong,
-                $"The '{_options.HeaderName}' header must be at most {_options.MaxKeyLength} characters.");
+            await WriteProblemAsync(context, StatusCodes.Status400BadRequest,
+                $"Hlavička {_options.HeaderName} môže mať najviac {_options.MaxKeyLength} znakov.");
             return;
         }
 
@@ -99,13 +98,13 @@ public sealed partial class IdempotencyMiddleware(
                 return;
 
             case IdempotencyBeginStatus.InProgress:
-                await WriteProblemAsync(context, CommonErrors.IdempotencyInProgress,
-                    $"A request with this '{_options.HeaderName}' is already being processed.");
+                await WriteProblemAsync(context, StatusCodes.Status409Conflict,
+                    "Rovnaká požiadavka sa ešte spracúva. Počkajte, kým sa dokončí.");
                 return;
 
             case IdempotencyBeginStatus.Mismatch:
-                await WriteProblemAsync(context, CommonErrors.IdempotencyPayloadMismatch,
-                    $"This '{_options.HeaderName}' was already used with a different request payload.");
+                await WriteProblemAsync(context, StatusCodes.Status422UnprocessableEntity,
+                    "Táto požiadavka už bola odoslaná s inými údajmi.");
                 return;
         }
 
@@ -317,18 +316,17 @@ public sealed partial class IdempotencyMiddleware(
         hash.AppendData(bytes);
     }
 
-    /// <summary>Writes an RFC 7807 problem response with its <c>code</c> (picking up the host's ProblemDetails customisation).</summary>
-    private async Task WriteProblemAsync(HttpContext context, ErrorCode code, string detail)
+    /// <summary>Writes an RFC 7807 problem response with its Slovak <c>detail</c> (picking up the host's ProblemDetails customisation).</summary>
+    private async Task WriteProblemAsync(HttpContext context, int status, string detail)
     {
-        context.Response.StatusCode = code.Status;
+        context.Response.StatusCode = status;
         await problemDetails.WriteAsync(new ProblemDetailsContext
         {
             HttpContext = context,
             ProblemDetails =
             {
-                Status = code.Status,
+                Status = status,
                 Detail = detail,
-                Extensions = { ["code"] = code.Value },
             },
         });
     }

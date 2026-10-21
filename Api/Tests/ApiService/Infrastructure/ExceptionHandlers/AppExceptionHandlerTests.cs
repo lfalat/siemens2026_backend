@@ -9,21 +9,13 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Tests.ApiService.Infrastructure.ExceptionHandlers;
 
 /// <summary>
-/// Pins the machine-readable additions <see cref="AppExceptionHandler"/> writes for a multilingual client:
-/// an <see cref="AppException.Code"/> surfaces as a top-level <c>code</c>, and a
-/// <see cref="ValidationException"/>'s per-field codes surface as an <c>errorCodes</c> map index-aligned with
-/// <c>errors</c>. A code is written only when the exception carries one, so a plain 404 stays uncluttered.
+/// Pins what <see cref="AppExceptionHandler"/> writes for the Slovak-only frontend: the exception's message is the
+/// <c>detail</c> the frontend shows as is, a <see cref="ValidationException"/>'s per-field messages surface under
+/// <c>errors</c>, and a failure the framework or EF Core raises gets a Slovak default instead of its English text.
 /// </summary>
 public class AppExceptionHandlerTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
-    private static readonly ErrorCode OfferClosed = new(StatusCodes.Status409Conflict, "job_offer.closed", "The offer is closed.");
-
-    private static readonly ErrorCode ScanQueueFull = new(
-        StatusCodes.Status429TooManyRequests, "file.scan_queue_full", "Too many uploads are waiting for a scan.");
-
-    private static readonly FieldErrorCode SalaryRangeInverted = new("job_offer.salary_range_inverted", "Minimum above maximum.");
 
     private static IProblemDetailsService ProblemDetails() =>
         new ServiceCollection().AddLogging().AddProblemDetails()
@@ -57,79 +49,62 @@ public class AppExceptionHandlerTests
     }
 
     [Fact]
-    public async Task A_conflict_with_a_code_surfaces_it_as_code()
+    public async Task The_exceptions_message_is_the_detail()
     {
-        JsonElement problem = await WriteAsync(
-            new ConflictException("Applications are closed for this offer.") { Code = OfferClosed });
+        JsonElement problem = await WriteAsync(new ConflictException("Ponuka je uzavretá."));
 
-        Assert.Equal("job_offer.closed", problem.GetProperty("code").GetString());
+        Assert.Equal("Ponuka je uzavretá.", problem.GetProperty("detail").GetString());
+        Assert.False(problem.TryGetProperty("code", out _));
     }
 
     [Fact]
-    public async Task A_conflict_without_a_specific_code_answers_the_generic_one()
+    public async Task An_exception_without_a_message_answers_its_types_default()
     {
-        // Every problem carries a code (ADR-A017), so a client translates on `code` and never on the status.
-        JsonElement problem = await WriteAsync(new ConflictException("Something conflicts."));
+        JsonElement problem = await WriteAsync(new NotFoundException());
 
-        Assert.Equal(CommonErrors.Conflict.Value, problem.GetProperty("code").GetString());
+        Assert.Equal(ErrorMessages.NotFound, problem.GetProperty("detail").GetString());
     }
 
     [Fact]
-    public async Task A_plain_not_found_answers_the_generic_code()
-    {
-        JsonElement problem = await WriteAsync(new NotFoundException("No such job offer."));
-
-        Assert.Equal(CommonErrors.NotFound.Value, problem.GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task A_malformed_request_answers_the_code_for_its_status()
+    public async Task A_malformed_request_answers_the_slovak_message_for_its_status_not_the_frameworks()
     {
         JsonElement problem = await WriteAsync(new BadHttpRequestException("Unexpected end of request content.", 400));
 
-        Assert.Equal(CommonErrors.Malformed.Value, problem.GetProperty("code").GetString());
+        Assert.Equal(ErrorMessages.Malformed, problem.GetProperty("detail").GetString());
     }
 
     [Fact]
-    public void A_code_answered_with_another_status_is_refused_where_it_is_set()
-    {
-        // A 409 exception carrying a 404 code would answer a status the document doesn't list the code under.
-        Assert.Throws<ArgumentException>(() => new ConflictException("x") { Code = CommonErrors.NotFound });
-    }
-
-    [Fact]
-    public async Task A_validation_error_surfaces_an_index_aligned_error_codes_map()
+    public async Task A_validation_error_surfaces_its_field_messages()
     {
         ValidationException validation = ValidationException.ForField(
-            "SalaryMin", SalaryRangeInverted, "The minimum salary is above the maximum.");
+            "SalaryMin", "Minimálny plat je vyšší ako maximálny.");
 
         JsonElement problem = await WriteAsync(validation);
 
-        Assert.Equal(CommonErrors.ValidationFailed.Value, problem.GetProperty("code").GetString());
-        Assert.Equal("The minimum salary is above the maximum.",
+        Assert.Equal(ErrorMessages.ValidationFailed, problem.GetProperty("detail").GetString());
+        Assert.Equal("Minimálny plat je vyšší ako maximálny.",
             problem.GetProperty("errors").GetProperty("SalaryMin")[0].GetString());
-        Assert.Equal("job_offer.salary_range_inverted",
-            problem.GetProperty("errorCodes").GetProperty("SalaryMin")[0].GetString());
+        Assert.False(problem.TryGetProperty("errorCodes", out _));
     }
 
     [Fact]
     public async Task An_unreachable_dependency_tells_the_client_when_to_come_back()
     {
         (_, DefaultHttpContext context) =
-            await WriteToContextAsync(new ServiceUnavailableException("The e-mail service could not be reached."));
+            await WriteToContextAsync(new ServiceUnavailableException());
 
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
         Assert.Equal("5", context.Response.Headers.RetryAfter);
     }
 
     [Fact]
-    public async Task A_concurrency_conflict_is_a_409_with_a_code_instead_of_a_500()
+    public async Task A_concurrency_conflict_is_a_409_instead_of_a_500()
     {
         // e.g. a job offer edited by two recruiters at once: the loser's save sees a stale version.
         JsonElement problem = await WriteAsync(new DbUpdateConcurrencyException("The row was changed."));
 
         Assert.Equal(StatusCodes.Status409Conflict, problem.GetProperty("status").GetInt32());
-        Assert.Equal(CommonErrors.ConcurrencyConflict.Value, problem.GetProperty("code").GetString());
+        Assert.Equal(ErrorMessages.ConcurrencyConflict, problem.GetProperty("detail").GetString());
     }
 
     [Fact]
@@ -139,11 +114,10 @@ public class AppExceptionHandlerTests
         // timestamp in the body for a client that wants to say "try again at 14:05".
         DateTimeOffset retryAt = new(2026, 10, 13, 14, 5, 0, TimeSpan.Zero);
         (JsonElement problem, DefaultHttpContext context) = await WriteToContextAsync(new TooManyRequestsException(
-            "Too many uploads are waiting for a scan.", ScanQueueFull, TimeSpan.FromSeconds(1.2), retryAt));
+            "Na kontrolu čaká priveľa súborov.", TimeSpan.FromSeconds(1.2), retryAt));
 
         Assert.Equal(StatusCodes.Status429TooManyRequests, context.Response.StatusCode);
         Assert.Equal("2", context.Response.Headers.RetryAfter);
-        Assert.Equal("file.scan_queue_full", problem.GetProperty("code").GetString());
         Assert.Equal(retryAt, problem.GetProperty("retryAt").GetDateTimeOffset());
     }
 

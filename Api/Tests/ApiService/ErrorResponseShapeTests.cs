@@ -110,7 +110,7 @@ public class ErrorResponseShapeTests
     }
 
     [Fact]
-    public void A_code_the_writer_set_is_kept()
+    public void A_detail_the_writer_set_is_kept()
     {
         DefaultHttpContext http = new();
         ProblemDetailsContext context = new()
@@ -118,18 +118,18 @@ public class ErrorResponseShapeTests
             HttpContext = http,
             ProblemDetails = new ProblemDetails
             {
-                Status = StatusCodes.Status429TooManyRequests,
-                Extensions = { ["code"] = CommonErrors.IdempotencyInProgress.Value },
+                Status = StatusCodes.Status409Conflict,
+                Detail = "Rovnaká požiadavka sa ešte spracúva.",
             },
         };
 
         ProblemDetailsTelemetry.Customize(context);
 
-        Assert.Equal(CommonErrors.IdempotencyInProgress.Value, context.ProblemDetails.Extensions["code"]);
+        Assert.Equal("Rovnaká požiadavka sa ešte spracúva.", context.ProblemDetails.Detail);
     }
 
     [Fact]
-    public void A_framework_validation_problem_gets_the_validation_code()
+    public void A_framework_validation_problem_gets_the_validation_message()
     {
         ProblemDetailsContext context = new()
         {
@@ -139,7 +139,7 @@ public class ErrorResponseShapeTests
 
         ProblemDetailsTelemetry.Customize(context);
 
-        Assert.Equal(CommonErrors.ValidationFailed.Value, context.ProblemDetails.Extensions["code"]);
+        Assert.Equal(ErrorMessages.ValidationFailed, context.ProblemDetails.Detail);
     }
 
     private static HttpRequestMessage SignedIn(HttpMethod method, string path)
@@ -151,7 +151,7 @@ public class ErrorResponseShapeTests
 
     /// <summary>
     /// Asserts the response is an RFC 7807 payload for <paramref name="expected"/>, carrying this service's customisation —
-    /// including the status's default <c>code</c>, since every problem carries one (ADR-A017).
+    /// including the status's default Slovak <c>detail</c>, since every problem carries one the frontend can show (ADR-A017).
     /// </summary>
     private static async Task AssertProblemJsonAsync(HttpResponseMessage response, HttpStatusCode expected, string path, CancellationToken ct)
     {
@@ -165,7 +165,7 @@ public class ErrorResponseShapeTests
         Assert.False(string.IsNullOrWhiteSpace(problem.GetProperty("title").GetString()));
         Assert.Equal(path, problem.GetProperty("instance").GetString());
         Assert.True(problem.TryGetProperty("traceId", out _));
-        Assert.Equal(CommonErrors.ForStatus((int)expected).Value, problem.GetProperty("code").GetString());
+        Assert.Equal(ErrorMessages.ForStatus((int)expected), problem.GetProperty("detail").GetString());
     }
 
     [Fact]

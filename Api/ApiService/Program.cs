@@ -114,7 +114,7 @@ builder.Services.AddRateLimiter(options =>
             ProblemDetails =
             {
                 Status = StatusCodes.Status429TooManyRequests,
-                Detail = "Too many requests. Retry after the interval in the Retry-After header.",
+                Detail = ErrorMessages.RateLimited,
             },
         });
     };
@@ -191,14 +191,13 @@ builder.Services
         // part of the document that describes a sequence, and what Schemathesis's stateful phase chains (ADR-009).
         options.Document.AddOperationTransformer<ResponseLinkTransformer>();
 
-        // ADR-A017: the error codes each operation can answer with, under each error response — after the idempotency
-        // transformer, whose responses it adds codes to — and the full catalog as the ErrorCode / FieldErrorCode enums.
-        options.Document.AddOperationTransformer<ErrorCodeTransformer>();
-        options.Document.AddDocumentTransformer<ErrorCodeCatalogTransformer>();
+        // The problem responses the host adds by rule rather than per endpoint: a write's 409 for a stale version, a
+        // policy's 403, the 400 of a command's validation rules. Without it, Schemathesis (ADR-009) meets them undeclared.
+        options.Document.AddOperationTransformer<ProblemResponseTransformer>();
     });
 
 // Kernel.Exceptions, a stale optimistic-concurrency version and an unparseable request are the caller's to fix:
-// answered with their own status and code, never logged as faults (docs/api/errors/errors.md).
+// answered with their own status and Slovak message, never logged as faults (docs/api/errors/errors.md).
 builder.Services.AddExceptionHandler<AppExceptionHandler>();
 
 // A NUL byte in any text field is the caller's data, not our fault — without this it reaches PostgreSQL and
@@ -279,8 +278,10 @@ ApiVersionSet versionSet = app.NewApiVersionSet()
 RouteGroupBuilder api = app.MapGroup("/api/v{version:apiVersion}")
     .WithApiVersionSet(versionSet)
     .RequireRateLimiting(RateLimitPolicies.PerCaller)
-    // What any endpoint here can answer before or around its own handler (ADR-A017).
-    .ProducesErrors([.. CommonErrors.AnyEndpoint]);
+    // What any endpoint here can answer before or around its own handler: an unparseable body or route value, and
+    // the per-caller rate limit. A staff group adds its 401 through RequireStaff.
+    .ProducesProblem(StatusCodes.Status400BadRequest)
+    .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
 api.MapGet("/hello", () => "Hello, HealthyHires!");
 api.MapMe();

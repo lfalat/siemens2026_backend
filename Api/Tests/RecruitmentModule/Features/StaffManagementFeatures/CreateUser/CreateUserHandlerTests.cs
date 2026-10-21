@@ -1,7 +1,6 @@
 using Kernel.Auth;
 using Kernel.Exceptions;
 using Microsoft.Extensions.Logging.Abstractions;
-using RecruitmentModule.Domain;
 using RecruitmentModule.Features.StaffManagementFeatures.CreateUser;
 using RecruitmentModule.Infrastructure.Entra;
 using Tests.Shared;
@@ -38,14 +37,14 @@ public class CreateUserHandlerTests
         ConflictException e = await Assert.ThrowsAsync<ConflictException>(
             () => Handler(directory).HandleAsync(Command, TestContext.Current.CancellationToken));
 
-        Assert.Equal(RecruitmentErrors.UsernameTaken, e.Code);
+        Assert.Equal("Účet s používateľským menom „jana.novakova“ už existuje.", e.Message);
         Assert.Empty(directory.Created);
     }
 
     [Fact]
     public async Task A_failed_role_assignment_deletes_the_account_and_surfaces()
     {
-        ExternalServiceException failure = new("Microsoft Graph refused to assign the app role.");
+        ExternalServiceException failure = new("Adresár Microsoft Entra odmietol priradiť rolu (Authorization_RequestDenied).");
         FakeStaffDirectory directory = new() { AssignFailure = failure };
 
         Exception e = await Assert.ThrowsAnyAsync<Exception>(
@@ -58,7 +57,7 @@ public class CreateUserHandlerTests
     [Fact]
     public async Task A_failed_delete_does_not_hide_the_assignment_failure()
     {
-        ExternalServiceException failure = new("Microsoft Graph refused to assign the app role.");
+        ExternalServiceException failure = new("Adresár Microsoft Entra odmietol priradiť rolu (Authorization_RequestDenied).");
         FakeStaffDirectory directory = new()
         {
             AssignFailure = failure,

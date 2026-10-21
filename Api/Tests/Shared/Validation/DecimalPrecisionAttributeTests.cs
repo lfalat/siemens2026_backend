@@ -34,6 +34,6 @@ public class DecimalPrecisionAttributeTests
     [Fact]
     public void Names_the_limits_in_its_message() =>
         Assert.Equal(
-            "Must have at most 6 decimal places and 12 digits before the decimal point.",
+            "Číslo môže mať najviac 6 desatinných miest a 12 číslic pred desatinnou čiarkou.",
             Numeric18Scale6.FormatErrorMessage("FxRate"));
 }

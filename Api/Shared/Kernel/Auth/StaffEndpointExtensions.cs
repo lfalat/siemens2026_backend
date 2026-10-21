@@ -1,5 +1,5 @@
-using Kernel.Errors;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
 namespace Kernel.Auth;
@@ -8,8 +8,8 @@ namespace Kernel.Auth;
 public static class StaffEndpointExtensions
 {
     /// <summary>
-    /// Requires <paramref name="policy"/> on every endpoint in the group and declares <c>auth.unauthenticated</c> for
-    /// them; <c>auth.forbidden</c> follows by rule wherever a policy applies (ADR-A017). An endpoint in the group
+    /// Requires <paramref name="policy"/> on every endpoint in the group and declares its <c>401</c>; the <c>403</c>
+    /// follows by rule wherever a policy applies (<c>ProblemResponseTransformer</c>). An endpoint in the group
     /// that needs a specific role adds e.g. <c>.RequireAuthorization(StaffPolicies.Admin)</c>; both policies then apply.
     /// </summary>
     /// <param name="group">The module's staff route group.</param>
@@ -18,6 +18,6 @@ public static class StaffEndpointExtensions
     public static RouteGroupBuilder RequireStaff(this RouteGroupBuilder group, string policy = StaffPolicies.Staff)
     {
         group.RequireAuthorization(policy);
-        return group.ProducesErrors(CommonErrors.Unauthenticated);
+        return group.ProducesProblem(StatusCodes.Status401Unauthorized);
     }
 }

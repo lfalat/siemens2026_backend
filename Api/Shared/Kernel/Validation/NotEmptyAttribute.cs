@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Kernel.Errors;
 
 namespace Kernel.Validation;
 
@@ -21,16 +20,13 @@ namespace Kernel.Validation;
 /// </para>
 /// </remarks>
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter | AttributeTargets.Field)]
-public sealed class NotEmptyAttribute : ValidationAttribute, IValidationErrorCode
+public sealed class NotEmptyAttribute : ValidationAttribute
 {
     /// <summary>Creates the attribute with its default message.</summary>
     public NotEmptyAttribute()
-        : base("A value is required.")
+        : base("Toto pole je povinné.")
     {
     }
-
-    /// <inheritdoc />
-    public FieldErrorCode ErrorCode => ValidationRuleErrors.NotEmpty;
 
     /// <inheritdoc />
     public override bool IsValid(object? value) => value switch

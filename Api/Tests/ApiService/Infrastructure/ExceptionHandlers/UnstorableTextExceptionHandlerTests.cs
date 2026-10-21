@@ -1,4 +1,6 @@
+using System.Text.Json;
 using ApiService.Infrastructure.ExceptionHandlers;
+using Kernel.Errors;
 using Kernel.Idempotency;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -139,7 +141,8 @@ public class UnstorableTextExceptionHandlerTests
         string body = await new StreamReader(context.Response.Body).ReadToEndAsync(Ct);
 
         Assert.DoesNotContain("0x00", body, StringComparison.Ordinal);
-        Assert.Contains("cannot be stored", body, StringComparison.Ordinal);
+        Assert.Equal(ErrorMessages.UnstorableText,
+            JsonDocument.Parse(body).RootElement.GetProperty("detail").GetString());
     }
 
     [Fact]

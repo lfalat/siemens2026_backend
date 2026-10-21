@@ -1,12 +1,10 @@
 using Kernel.Auth;
 using Kernel.CQRS;
 using Kernel.Endpoints;
-using Kernel.Errors;
 using Kernel.Idempotency;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using RecruitmentModule.Domain;
 
 namespace RecruitmentModule.Features.StaffManagementFeatures.CreateUser;
 
@@ -36,5 +34,7 @@ internal sealed class CreateUserEndpoint : IEndpoint
             // The username makes the call at-most-once anyway: a repeat answers 409.
             .DisableIdempotency()
             .Produces<CreateUserResponse>(StatusCodes.Status201Created)
-            .ProducesErrors(RecruitmentErrors.UsernameTaken, CommonErrors.UpstreamFailed, CommonErrors.UpstreamUnavailable);
+            .ProducesProblem(StatusCodes.Status409Conflict) // the username is taken
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 }

@@ -2,21 +2,20 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using Kernel.CQRS;
 using Kernel.Errors;
-using Kernel.Validation;
 
 namespace Kernel.Decorators;
 
 /// <summary>
 /// Validates a command's public properties against their DataAnnotations attributes and throws a
-/// <see cref="Exceptions.ValidationException"/> carrying two member-keyed maps when any rule fails: the
-/// English messages and the index-aligned stable <c>errorCodes</c> a multilingual client translates on.
+/// <see cref="Exceptions.ValidationException"/> carrying the member-keyed Slovak messages
+/// (<see cref="ValidationMessages"/>) when any rule fails.
 /// </summary>
 /// <remarks>
 /// It validates attribute-by-attribute (rather than through
 /// <see cref="Validator.TryValidateObject(object, ValidationContext, ICollection{ValidationResult}, bool)"/>)
-/// precisely so it knows <em>which</em> attribute failed and can name its code. Per-property semantics match
+/// precisely so it knows <em>which</em> attribute failed and can word its message. Per-property semantics match
 /// the framework's: a failing <see cref="RequiredAttribute"/> short-circuits the rest of that property's
-/// rules, so a missing value reports <c>required</c> alone rather than also tripping every format rule.
+/// rules, so a missing value reports that it is required, rather than also tripping every format rule.
 /// Class-level attributes and <see cref="IValidatableObject"/> are not consulted — commands express their
 /// rules per property, and the OpenAPI schema mirror does the same.
 /// </remarks>
@@ -28,7 +27,6 @@ internal static class CommandValidator
     public static void Validate(object command)
     {
         Dictionary<string, List<string>> messages = [];
-        Dictionary<string, List<FieldErrorCode>> codes = [];
 
         foreach (PropertyInfo property in command.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
@@ -42,51 +40,43 @@ internal static class CommandValidator
             object? value = property.GetValue(command);
             ValidationContext context = new(command) { MemberName = property.Name, DisplayName = property.Name };
 
-            // Required runs first and short-circuits: a missing value reports `required`, not a pile of
+            // Required runs first and short-circuits: a missing value reports that alone, not a pile of
             // format failures on the value it does not have — matching Validator.TryValidateObject.
             RequiredAttribute? required = attributes.OfType<RequiredAttribute>().FirstOrDefault();
-            if (required is not null && Record(required, value, context, property.Name, messages, codes))
+            if (required is not null && Record(required, value, context, property.Name, messages))
                 continue;
 
             foreach (ValidationAttribute attribute in attributes)
             {
                 if (attribute is RequiredAttribute)
                     continue;
-                Record(attribute, value, context, property.Name, messages, codes);
+                Record(attribute, value, context, property.Name, messages);
             }
         }
 
         if (messages.Count == 0)
             return;
 
-        throw new Exceptions.ValidationException(
-            messages.ToDictionary(e => e.Key, e => e.Value.ToArray()),
-            codes.ToDictionary(e => e.Key, e => e.Value.ToArray()));
+        throw new Exceptions.ValidationException(messages.ToDictionary(e => e.Key, e => e.Value.ToArray()));
     }
 
-    /// <summary>Runs one attribute; on failure records its message and code under each reported member. Returns whether it failed.</summary>
+    /// <summary>Runs one attribute; on failure records its Slovak message under each reported member. Returns whether it failed.</summary>
     private static bool Record(
         ValidationAttribute attribute, object? value, ValidationContext context, string propertyName,
-        Dictionary<string, List<string>> messages, Dictionary<string, List<FieldErrorCode>> codes)
+        Dictionary<string, List<string>> messages)
     {
         ValidationResult? result = attribute.GetValidationResult(value, context);
         if (result is null || result == ValidationResult.Success)
             return false;
 
-        FieldErrorCode code = ValidationRuleErrors.For(attribute);
+        string message = ValidationMessages.For(attribute, value, propertyName);
         foreach (string member in result.MemberNames.DefaultIfEmpty(propertyName))
         {
-            Append(messages, member, result.ErrorMessage ?? string.Empty);
-            Append(codes, member, code);
+            if (!messages.TryGetValue(member, out List<string>? list))
+                messages[member] = list = [];
+            list.Add(message);
         }
         return true;
-    }
-
-    private static void Append<T>(Dictionary<string, List<T>> map, string key, T value)
-    {
-        if (!map.TryGetValue(key, out List<T>? list))
-            map[key] = list = [];
-        list.Add(value);
     }
 }
 

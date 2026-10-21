@@ -6,7 +6,8 @@ namespace ApiService.Infrastructure.ExceptionHandlers;
 
 /// <summary>
 /// Catch-all exception handler: logs the failure and returns a generic HTTP 500 <c>ProblemDetails</c> response
-/// without leaking internal detail. Registered last so the typed handlers get first chance.
+/// with <see cref="ErrorMessages.ServerError"/>, never anything from the exception. Registered last so the typed
+/// handlers get first chance.
 /// </summary>
 internal sealed partial class UnhandledExceptionHandler(
     IProblemDetailsService problemDetails,
@@ -46,7 +47,7 @@ internal sealed partial class UnhandledExceptionHandler(
             {
                 Status = StatusCodes.Status500InternalServerError,
                 Title = "An unexpected error occurred.",
-                Extensions = { ["code"] = CommonErrors.ServerError.Value },
+                Detail = ErrorMessages.ServerError,
             }
         });
     }

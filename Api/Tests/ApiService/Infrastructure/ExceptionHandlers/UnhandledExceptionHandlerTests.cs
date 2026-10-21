@@ -8,7 +8,7 @@ namespace Tests.ApiService.Infrastructure.ExceptionHandlers;
 
 /// <summary>
 /// The catch-all: a genuine fault is logged with the route template — not the path, which carries ids and applicant
-/// values — and answered with a bare <c>500</c> that carries <c>server.error</c> and nothing from the exception.
+/// values — and answered with a bare <c>500</c> that carries the generic Slovak message and nothing from the exception.
 /// </summary>
 public class UnhandledExceptionHandlerTests
 {
@@ -25,7 +25,7 @@ public class UnhandledExceptionHandlerTests
     }
 
     [Fact]
-    public async Task A_fault_is_a_500_with_the_server_error_code_and_no_detail_from_the_exception()
+    public async Task A_fault_is_a_500_with_the_generic_message_and_no_detail_from_the_exception()
     {
         const string secret = "connection string with a password in it";
         RecordingLogger logger = new();
@@ -45,7 +45,7 @@ public class UnhandledExceptionHandlerTests
         string body = await new StreamReader(context.Response.Body).ReadToEndAsync(Ct);
         JsonElement problem = JsonDocument.Parse(body).RootElement;
         Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
-        Assert.Equal(CommonErrors.ServerError.Value, problem.GetProperty("code").GetString());
+        Assert.Equal(ErrorMessages.ServerError, problem.GetProperty("detail").GetString());
         Assert.DoesNotContain(secret, body, StringComparison.Ordinal);
 
         (int id, string message, Exception? logged) = Assert.Single(logger.Events);

@@ -2,7 +2,6 @@ using System.Diagnostics.Metrics;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
-using Kernel.Errors;
 using Kernel.Idempotency;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -148,9 +147,9 @@ public class IdempotencyMiddlewareTests
         return new StreamReader(response, Encoding.UTF8).ReadToEnd();
     }
 
-    /// <summary>The <c>code</c> of the problem the middleware wrote — each rejection has its own.</summary>
-    private static string? CodeOf(MemoryStream response) =>
-        JsonDocument.Parse(ReadBody(response)).RootElement.GetProperty("code").GetString();
+    /// <summary>The <c>detail</c> of the problem the middleware wrote — each rejection has its own message.</summary>
+    private static string DetailOf(MemoryStream response) =>
+        JsonDocument.Parse(ReadBody(response)).RootElement.GetProperty("detail").GetString()!;
 
     [Fact]
     public async Task Missing_key_on_covered_write_is_rejected_with_400()
@@ -163,7 +162,7 @@ public class IdempotencyMiddlewareTests
 
         Assert.Equal(StatusCodes.Status400BadRequest, ctx.Response.StatusCode);
         Assert.Equal(0, next.Calls);
-        Assert.Equal(CommonErrors.IdempotencyKeyMissing.Value, CodeOf(response));
+        Assert.Contains("Idempotency-Key", DetailOf(response));
     }
 
     [Fact]
@@ -177,7 +176,7 @@ public class IdempotencyMiddlewareTests
 
         Assert.Equal(StatusCodes.Status400BadRequest, ctx.Response.StatusCode);
         Assert.Equal(0, next.Calls);
-        Assert.Equal(CommonErrors.IdempotencyKeyTooLong.Value, CodeOf(response));
+        Assert.Contains("128", DetailOf(response));
         Assert.Null(store.Key); // rejected before the key ever reaches the store
     }
 
@@ -344,7 +343,7 @@ public class IdempotencyMiddlewareTests
 
         Assert.Equal(StatusCodes.Status409Conflict, ctx.Response.StatusCode);
         Assert.Equal(0, next.Calls);
-        Assert.Equal(CommonErrors.IdempotencyInProgress.Value, CodeOf(response));
+        Assert.Contains("spracúva", DetailOf(response));
     }
 
     [Fact]
@@ -358,7 +357,7 @@ public class IdempotencyMiddlewareTests
 
         Assert.Equal(StatusCodes.Status422UnprocessableEntity, ctx.Response.StatusCode);
         Assert.Equal(0, next.Calls);
-        Assert.Equal(CommonErrors.IdempotencyPayloadMismatch.Value, CodeOf(response));
+        Assert.Contains("inými údajmi", DetailOf(response));
     }
 
     [Fact]

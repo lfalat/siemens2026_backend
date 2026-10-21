@@ -8,15 +8,14 @@ using Microsoft.EntityFrameworkCore;
 namespace ApiService.Infrastructure.ExceptionHandlers;
 
 /// <summary>
-/// Translates client-error exceptions into a <c>ProblemDetails</c> response: any <see cref="AppException"/>
-/// (using its <see cref="AppException.StatusCode"/> and message, its <see cref="AppException.Code"/> under a
-/// top-level <c>code</c>, with <see cref="ValidationException"/> also exposing its per-member
-/// messages under <c>errors</c> and the index-aligned per-member codes under <c>errorCodes</c>), EF Core's
-/// <see cref="DbUpdateConcurrencyException"/> (another request changed the row first — a <c>409</c> with the code
-/// <c>concurrency.conflict</c>), and the framework's <see cref="BadHttpRequestException"/> (a malformed request body /
-/// route value — its own status, usually 400, with the code for that status). All are answerable by the caller, so they
-/// are turned into a tidy response and <b>not</b> re-thrown to the catch-all handler that logs unhandled faults. Returns
-/// <c>false</c> for other exceptions.
+/// Translates client-error exceptions into a <c>ProblemDetails</c> response whose <c>detail</c> is the Slovak message
+/// the frontend shows: any <see cref="AppException"/> (its <see cref="AppException.StatusCode"/> and message, with
+/// <see cref="ValidationException"/> also exposing its per-member messages under <c>errors</c>), EF Core's
+/// <see cref="DbUpdateConcurrencyException"/> (another request changed the row first — a <c>409</c>), and the
+/// framework's <see cref="BadHttpRequestException"/> (a malformed request body / route value — its own status, usually
+/// 400, with that status's default message, since the framework's own is English and technical). All are answerable by
+/// the caller, so they are turned into a tidy response and <b>not</b> re-thrown to the catch-all handler that logs
+/// unhandled faults. Returns <c>false</c> for other exceptions.
 /// </summary>
 internal sealed class AppExceptionHandler(IProblemDetailsService problemDetails) : IExceptionHandler
 {
@@ -26,9 +25,7 @@ internal sealed class AppExceptionHandler(IProblemDetailsService problemDetails)
         int statusCode;
         string detail;
         string? problemType = null;
-        ErrorCode code;
         IReadOnlyDictionary<string, string[]>? errors = null;
-        IReadOnlyDictionary<string, string[]>? errorCodes = null;
         DateTimeOffset? retryAtExtension = null;
 
         switch (exception)
@@ -37,12 +34,8 @@ internal sealed class AppExceptionHandler(IProblemDetailsService problemDetails)
                 statusCode = app.StatusCode;
                 detail = app.Message;
                 problemType = app.ProblemType;
-                code = app.Code;
                 if (app is ValidationException validation)
-                {
                     errors = validation.Errors;
-                    errorCodes = validation.ErrorCodeValues;
-                }
                 // Tells the client how long to wait rather than leaving it to guess or hammer. Both cases
                 // mean "come back later": nobody was home, or a limit has to run out first.
                 int? retryAfter = app switch
@@ -62,15 +55,13 @@ internal sealed class AppExceptionHandler(IProblemDetailsService problemDetails)
             // offer edited by two recruiters at once. Nothing was saved; the client reloads and retries. Not a fault.
             case DbUpdateConcurrencyException:
                 statusCode = StatusCodes.Status409Conflict;
-                detail = "The resource was changed by another request while this one was being processed; reload it and try again.";
-                code = CommonErrors.ConcurrencyConflict;
+                detail = ErrorMessages.ConcurrencyConflict;
                 break;
 
             // Unparseable body, bad route/query value, body too large, etc. — a client error, not a fault.
             case BadHttpRequestException bad:
                 statusCode = bad.StatusCode;
-                detail = bad.Message;
-                code = CommonErrors.ForStatus(bad.StatusCode);
+                detail = ErrorMessages.ForStatus(bad.StatusCode);
                 break;
 
             default:
@@ -85,16 +76,8 @@ internal sealed class AppExceptionHandler(IProblemDetailsService problemDetails)
         if (problemType is not null)
             problem.Type = problemType;
 
-        // A stable, machine-readable handle for this specific error. Independent of `type`: `type` is a URI
-        // that classifies the problem, `code` is the short key a multilingual client translates on.
-        problem.Extensions["code"] = code.Value;
-
         if (errors is not null)
             problem.Extensions["errors"] = errors;
-
-        // Index-aligned with `errors`: same member keys, the stable code for each message.
-        if (errorCodes is not null)
-            problem.Extensions["errorCodes"] = errorCodes;
 
         // When a 429's wait ends, as a timestamp: the header carries seconds, which a client would have to add up.
         if (retryAtExtension is { } at)

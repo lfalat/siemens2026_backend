@@ -21,7 +21,7 @@ internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<Sta
 
     /// <inheritdoc />
     public Task<bool> UserExistsAsync(string username, CancellationToken ct) =>
-        CallAsync("look up the account", async () =>
+        CallAsync("overiť účet", async () =>
         {
             try
             {
@@ -36,7 +36,7 @@ internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<Sta
 
     /// <inheritdoc />
     public Task<StaffAccount> CreateUserAsync(string displayName, string username, string password, CancellationToken ct) =>
-        CallAsync("create the account", async () =>
+        CallAsync("vytvoriť účet", async () =>
         {
             User user = await graph.Users.PostAsync(new User
             {
@@ -54,7 +54,7 @@ internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<Sta
     public async Task AssignAppRoleAsync(Guid userId, string role, CancellationToken ct)
     {
         string apiClientId = Configured().ApiClientId!;
-        ServicePrincipal api = await CallAsync("read the API's enterprise application", () =>
+        ServicePrincipal api = await CallAsync("načítať podnikovú aplikáciu API", () =>
                 graph.ServicePrincipalsWithAppId(apiClientId).GetAsync(r => r.QueryParameters.Select = ["id", "appRoles"], ct), ct)
             ?? throw new InvalidOperationException($"The tenant has no enterprise application for the API registration {apiClientId}.");
 
@@ -63,7 +63,7 @@ internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<Sta
 
         AppRoleAssignment assignment = new() { PrincipalId = userId, ResourceId = Guid.Parse(api.Id!), AppRoleId = appRole.Id };
 
-        await CallAsync("assign the app role", async () =>
+        await CallAsync("priradiť rolu", async () =>
         {
             for (int attempt = 1; ; attempt++)
             {
@@ -83,7 +83,7 @@ internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<Sta
 
     /// <inheritdoc />
     public Task DeleteUserAsync(Guid userId, CancellationToken ct) =>
-        CallAsync("delete the account", async () =>
+        CallAsync("zmazať účet", async () =>
         {
             await graph.Users[userId.ToString()].DeleteAsync(cancellationToken: ct);
             return true;
@@ -97,7 +97,10 @@ internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<Sta
             : throw new InvalidOperationException(
                 $"{StaffDirectoryOptions.SectionName}:ApiClientId and {StaffDirectoryOptions.SectionName}:UserDomain must be set to manage staff accounts.");
 
-    /// <summary>Runs a Graph call, turning its failures into the exceptions the host answers with 502 and 503.</summary>
+    /// <summary>
+    /// Runs a Graph call, turning its failures into the exceptions the host answers with 502 and 503. The messages are
+    /// shown to the administrator; <paramref name="action"/> completes them, in Slovak (e.g. <c>vytvoriť účet</c>).
+    /// </summary>
     private static async Task<T> CallAsync<T>(string action, Func<Task<T>> call, CancellationToken ct)
     {
         try
@@ -106,24 +109,24 @@ internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<Sta
         }
         catch (ODataError e) when (e.ResponseStatusCode is 429 or >= 500)
         {
-            throw new ServiceUnavailableException($"Microsoft Graph could not {action} right now.", e);
+            throw new ServiceUnavailableException($"Adresár Microsoft Entra teraz nedokáže {action}. Skúste to znova o chvíľu.", e);
         }
         catch (ODataError e)
         {
             // Graph's own code (e.g. Authorization_RequestDenied when a permission is missing) tells the admin why.
-            throw new ExternalServiceException($"Microsoft Graph refused to {action}: {e.Error?.Code ?? e.ResponseStatusCode.ToString(CultureInfo.InvariantCulture)}.", e);
+            throw new ExternalServiceException($"Adresár Microsoft Entra odmietol {action} ({e.Error?.Code ?? e.ResponseStatusCode.ToString(CultureInfo.InvariantCulture)}).", e);
         }
         catch (AuthenticationFailedException e)
         {
-            throw new ExternalServiceException("The API could not sign in to Microsoft Graph.", e);
+            throw new ExternalServiceException("Aplikácia sa nedokázala prihlásiť do adresára Microsoft Entra. Kontaktujte správcu.", e);
         }
         catch (HttpRequestException e)
         {
-            throw new ServiceUnavailableException("Microsoft Graph could not be reached.", e);
+            throw new ServiceUnavailableException("Adresár Microsoft Entra je nedostupný. Skúste to znova o chvíľu.", e);
         }
         catch (TaskCanceledException e) when (!ct.IsCancellationRequested)
         {
-            throw new ServiceUnavailableException("Microsoft Graph did not answer in time.", e);
+            throw new ServiceUnavailableException("Adresár Microsoft Entra neodpovedal včas. Skúste to znova o chvíľu.", e);
         }
     }
 }

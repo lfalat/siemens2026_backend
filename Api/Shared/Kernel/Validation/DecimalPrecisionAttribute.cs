@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
-using Kernel.Errors;
 
 namespace Kernel.Validation;
 
@@ -17,16 +16,13 @@ namespace Kernel.Validation;
 /// <param name="precision">The column's total number of significant digits.</param>
 /// <param name="scale">The column's number of digits after the decimal point.</param>
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter | AttributeTargets.Field)]
-public sealed class DecimalPrecisionAttribute(int precision, int scale) : ValidationAttribute, IValidationErrorCode
+public sealed class DecimalPrecisionAttribute(int precision, int scale) : ValidationAttribute
 {
     /// <summary>The column's total number of significant digits.</summary>
     public int Precision { get; } = precision;
 
     /// <summary>The column's number of digits after the decimal point.</summary>
     public int Scale { get; } = scale;
-
-    /// <inheritdoc />
-    public FieldErrorCode ErrorCode => ValidationRuleErrors.DecimalPrecision;
 
     /// <inheritdoc />
     public override bool IsValid(object? value)
@@ -48,6 +44,6 @@ public sealed class DecimalPrecisionAttribute(int precision, int scale) : Valida
     public override string FormatErrorMessage(string name) =>
         string.Format(
             CultureInfo.InvariantCulture,
-            "Must have at most {0} decimal places and {1} digits before the decimal point.",
+            "Číslo môže mať najviac {0} desatinných miest a {1} číslic pred desatinnou čiarkou.",
             Scale, Precision - Scale);
 }
