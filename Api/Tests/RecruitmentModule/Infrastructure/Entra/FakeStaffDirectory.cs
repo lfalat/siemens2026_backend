@@ -1,6 +1,6 @@
 using RecruitmentModule.Infrastructure.Entra;
 
-namespace Tests.RecruitmentModule.Features.StaffManagementFeatures.CreateUser;
+namespace Tests.RecruitmentModule.Infrastructure.Entra;
 
 /// <summary>An in-memory Entra tenant that records what was asked of it, and fails where a test says so.</summary>
 internal sealed class FakeStaffDirectory : IStaffDirectory
@@ -12,6 +12,7 @@ internal sealed class FakeStaffDirectory : IStaffDirectory
     public List<(string DisplayName, string Username, string Password)> Created { get; } = [];
     public List<(Guid UserId, string Role)> Assigned { get; } = [];
     public List<Guid> Deleted { get; } = [];
+    public List<StaffMember> Staff { get; } = [];
     public Exception? AssignFailure { get; set; }
     public Exception? DeleteFailure { get; set; }
 
@@ -32,6 +33,9 @@ internal sealed class FakeStaffDirectory : IStaffDirectory
         Assigned.Add((userId, role));
         return Task.CompletedTask;
     }
+
+    public Task<IReadOnlyList<StaffMember>> ListStaffAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<StaffMember>>(Staff);
 
     public Task DeleteUserAsync(Guid userId, CancellationToken ct)
     {

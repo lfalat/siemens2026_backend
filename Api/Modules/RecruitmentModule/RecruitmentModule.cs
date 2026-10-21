@@ -4,10 +4,13 @@ using Kernel.Endpoints;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Graph;
+using Npgsql;
 using RecruitmentModule.Domain;
+using RecruitmentModule.Infrastructure;
 using RecruitmentModule.Infrastructure.Entra;
 
 namespace RecruitmentModule;
@@ -20,6 +23,13 @@ public static class RecruitmentModule
     /// <returns>The same <paramref name="services"/> for chaining.</returns>
     public static IServiceCollection AddRecruitmentModule(this IServiceCollection services)
     {
+        // The host registers one NpgsqlDataSource ("healthyhires"); it carries the managed-identity sign-in in
+        // production, so the context reuses it instead of a connection string of its own.
+        services.AddDbContextPool<RecruitmentDbContext>((sp, options) =>
+            options.UseNpgsql(
+                sp.GetRequiredService<NpgsqlDataSource>(),
+                npgsql => npgsql.EnableRetryOnFailure())); // ADR-A011 at the database layer
+
         services.AddCqrsHandlers(typeof(RecruitmentModule).Assembly);
 
         // Staff accounts live in Entra (iam.md §2.4). Like sign-in, the settings are required outside Development.

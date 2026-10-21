@@ -40,5 +40,5 @@ public static class StaffClaims
         Guid.TryParse(user.FindFirstValue(ObjectId), out Guid id)
             ? id
             : throw new InvalidOperationException(
-                "The caller has no object id; GetStaffId is only valid on an endpoint behind a staff policy.");
+                "The caller has no object id, GetStaffId is only valid on an endpoint behind a staff policy.");
 }

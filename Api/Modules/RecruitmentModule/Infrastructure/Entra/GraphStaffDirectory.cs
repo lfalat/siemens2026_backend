@@ -10,8 +10,8 @@ namespace RecruitmentModule.Infrastructure.Entra;
 
 /// <summary>
 /// <see cref="IStaffDirectory"/> over Microsoft Graph, signed in as the VM's managed identity. That identity holds the
-/// Graph application permissions <c>User.ReadWrite.All</c>, <c>Application.Read.All</c> and
-/// <c>AppRoleAssignment.ReadWrite.All</c> (iam.md §4.2, <c>scripts/azure/graph-grant-identity.sh</c>).
+/// Graph application permissions <c>User.ReadWrite.All</c>, <c>Application.Read.All</c> (which also lists the role
+/// assignments) and <c>AppRoleAssignment.ReadWrite.All</c> (iam.md §4.2, <c>scripts/azure/graph-grant-identity.sh</c>).
 /// </summary>
 internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<StaffDirectoryOptions> options)
     : IStaffDirectory
@@ -53,10 +53,7 @@ internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<Sta
     /// <inheritdoc />
     public async Task AssignAppRoleAsync(Guid userId, string role, CancellationToken ct)
     {
-        string apiClientId = Configured().ApiClientId!;
-        ServicePrincipal api = await CallAsync("načítať podnikovú aplikáciu API", () =>
-                graph.ServicePrincipalsWithAppId(apiClientId).GetAsync(r => r.QueryParameters.Select = ["id", "appRoles"], ct), ct)
-            ?? throw new InvalidOperationException($"The tenant has no enterprise application for the API registration {apiClientId}.");
+        ServicePrincipal api = await ApiServicePrincipalAsync(ct);
 
         AppRole appRole = api.AppRoles?.FirstOrDefault(r => r.Value == role && r.IsEnabled == true)
             ?? throw new InvalidOperationException($"The API registration defines no enabled app role '{role}'.");
@@ -82,12 +79,63 @@ internal sealed class GraphStaffDirectory(GraphServiceClient graph, IOptions<Sta
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<StaffMember>> ListStaffAsync(CancellationToken ct)
+    {
+        ServicePrincipal api = await ApiServicePrincipalAsync(ct);
+
+        // Only the enabled roles count; an assignment of the empty role id is "default access", which is no role.
+        Dictionary<Guid, string> roles = (api.AppRoles ?? [])
+            .Where(r => r.IsEnabled == true && r.Id is not null && r.Value is not null)
+            .ToDictionary(r => r.Id!.Value, r => r.Value!);
+
+        List<AppRoleAssignment> assignments = await CallAsync("načítať zamestnancov", async () =>
+        {
+            List<AppRoleAssignment> all = [];
+            AppRoleAssignmentCollectionResponse? page = await graph.ServicePrincipals[api.Id].AppRoleAssignedTo.GetAsync(r =>
+            {
+                r.QueryParameters.Select = ["principalId", "principalDisplayName", "principalType", "appRoleId"];
+                r.QueryParameters.Top = 999;
+            }, ct);
+
+            // Graph pages the assignments even when the API does not page the staff.
+            while (page is not null)
+            {
+                all.AddRange(page.Value ?? []);
+                if (page.OdataNextLink is null)
+                    break;
+                page = await graph.ServicePrincipals[api.Id].AppRoleAssignedTo.WithUrl(page.OdataNextLink).GetAsync(cancellationToken: ct);
+            }
+
+            return all;
+        }, ct);
+
+        return assignments
+            .Where(a => a.PrincipalType == "User" && a.PrincipalId is not null
+                        && a.AppRoleId is not null && roles.ContainsKey(a.AppRoleId.Value))
+            .GroupBy(a => a.PrincipalId!.Value)
+            .Select(g => new StaffMember(
+                g.Key,
+                g.First().PrincipalDisplayName ?? string.Empty,
+                g.Select(a => roles[a.AppRoleId!.Value]).Distinct().Order(StringComparer.Ordinal).ToList()))
+            .ToList();
+    }
+
+    /// <inheritdoc />
     public Task DeleteUserAsync(Guid userId, CancellationToken ct) =>
         CallAsync("zmazať účet", async () =>
         {
             await graph.Users[userId.ToString()].DeleteAsync(cancellationToken: ct);
             return true;
         }, ct);
+
+    /// <summary>The API registration's enterprise application, which defines the app roles and holds their assignments.</summary>
+    private async Task<ServicePrincipal> ApiServicePrincipalAsync(CancellationToken ct)
+    {
+        string apiClientId = Configured().ApiClientId!;
+        return await CallAsync("načítať podnikovú aplikáciu API", () =>
+                graph.ServicePrincipalsWithAppId(apiClientId).GetAsync(r => r.QueryParameters.Select = ["id", "appRoles"], ct), ct)
+            ?? throw new InvalidOperationException($"The tenant has no enterprise application for the API registration {apiClientId}.");
+    }
 
     private string UserPrincipalName(string username) => $"{username}@{Configured().UserDomain}";
 

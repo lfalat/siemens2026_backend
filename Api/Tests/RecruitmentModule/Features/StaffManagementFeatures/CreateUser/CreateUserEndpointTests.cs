@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using RecruitmentModule.Features.StaffManagementFeatures.CreateUser;
 using RecruitmentModule.Infrastructure.Entra;
 using Tests.ApiService.Infrastructure.Auth;
+using Tests.RecruitmentModule.Infrastructure.Entra;
 
 namespace Tests.RecruitmentModule.Features.StaffManagementFeatures.CreateUser;
 

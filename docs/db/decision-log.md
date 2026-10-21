@@ -42,3 +42,32 @@ pre-production phase.
 - The DDL can say what EF Core's model cannot (storage parameters, triggers, partial indexes) without hand-edited migrations.
 - Before the first production deployment, this script becomes the baseline and later changes need migrations — a
   decision still to be made.
+
+---
+
+## ADR-D003 — The audit trigger function lives in each module's schema
+
+**Date:** 2026-10-21 · **Status:** accepted
+
+The [audit trigger](conventions.md#audit-trigger-the-version--updated_at-rule) function is created as
+`<module>.set_audit_fields()`, one copy per module schema, starting with `recruitment.set_audit_fields()`.
+
+- A module's schema stays self-contained: extracting a module ([ADR-A001](../architecture/ADR-ASPNET.md#adr-a001-application-architecture--modular-monolith))
+  takes its tables and their trigger function along, with nothing left pointing at `public` or `kernel`.
+- The function is five lines and never changes, so the duplication costs nothing in practice.
+
+---
+
+## ADR-D004 — A job post's recruiter is an Entra object id, checked by the application
+
+**Date:** 2026-10-21 · **Status:** accepted
+
+`recruitment.job_post.recruiter_id` holds the Entra object id (`oid`) of the responsible recruiter. Staff accounts
+and their app roles live only in Entra ([iam.md §2.4](../architecture/iam.md#24-session-management)); there is no
+staff table to reference.
+
+- There is no foreign key and no role constraint. The assigning handler asks the directory (Microsoft Graph) that the
+  user holds the `Recruiter` role at the time of assignment.
+- A recruiter who later loses the role or is deleted in Entra stays on the job post until a hiring manager assigns
+  someone else. Reacting to that would need Entra change notifications, which nothing needs yet.
+- `created_by` and `updated_by` hold Entra object ids for the same reason, as every staff reference will.

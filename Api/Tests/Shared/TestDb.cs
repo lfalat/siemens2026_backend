@@ -2,6 +2,7 @@ using System.Diagnostics.Metrics;
 using Kernel.Idempotency;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using RecruitmentModule.Infrastructure;
 
 namespace Tests.Shared;
 
@@ -21,6 +22,17 @@ internal static class TestDb
     /// <param name="interceptors">Optional deterministic faults at the database command boundary.</param>
     public static IdempotencyDbContext NewIdempotencyContextOn(string connectionString, params IInterceptor[] interceptors) =>
         new(OptionsOn<IdempotencyDbContext>(connectionString).AddInterceptors(interceptors).Options);
+
+    /// <summary>A fresh Recruitment context (the <c>recruitment</c> schema).</summary>
+    public static RecruitmentDbContext NewRecruitmentContext() =>
+        new(Options<RecruitmentDbContext>().Options);
+
+    /// <summary>A fresh, empty database cloned from the schema template; its connection string, for a test host.</summary>
+    public static string NewDatabase()
+    {
+        PostgresTestHost.SkipIfSchemaUnavailable();
+        return PostgresTestHost.Current.CreateDatabase();
+    }
 
     /// <summary>An <see cref="IdempotencyMetrics"/> backed by a throwaway <see cref="IMeterFactory"/>.</summary>
     public static IdempotencyMetrics NewIdempotencyMetrics() =>

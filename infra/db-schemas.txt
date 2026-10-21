@@ -3,4 +3,5 @@
 # here and the grant script runs again before the first deploy that uses it. Each module's DbContext keeps its
 # EF Core migrations history table in its own schema.
 #
-# One name per line, lowercase letters, digits and underscores. Empty until the first module exists.
+# One name per line, lowercase letters, digits and underscores.
+recruitment

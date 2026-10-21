@@ -3,6 +3,7 @@ using Kernel.Exceptions;
 using Microsoft.Extensions.Logging.Abstractions;
 using RecruitmentModule.Features.StaffManagementFeatures.CreateUser;
 using RecruitmentModule.Infrastructure.Entra;
+using Tests.RecruitmentModule.Infrastructure.Entra;
 using Tests.Shared;
 
 namespace Tests.RecruitmentModule.Features.StaffManagementFeatures.CreateUser;

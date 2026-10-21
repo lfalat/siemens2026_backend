@@ -16,6 +16,7 @@
 -- Schemas (one per module / bounded context, plus the host-owned kernel)
 -- ---------------------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS kernel;
+CREATE SCHEMA IF NOT EXISTS recruitment;
 
 
 -- ===========================================================================
@@ -66,3 +67,58 @@ CREATE TABLE kernel.idempotency (
 CREATE INDEX idx_idempotency_expires_at ON kernel.idempotency (expires_at);
 -- The default 20% dead-tuple threshold lets a churn table like this bloat between passes.
 ALTER TABLE kernel.idempotency SET (autovacuum_vacuum_scale_factor = 0.02, autovacuum_analyze_scale_factor = 0.02);
+
+
+-- ===========================================================================
+--  MODULE: recruitment
+-- ===========================================================================
+
+-- set_audit_fields  (the audit trigger, conventions.md § Audit trigger)
+-- Maintains `updated_at` and `version` on every update, so the application can never forget them. A copy per
+-- module schema rather than one shared function, so a module's schema stays self-contained when it is
+-- extracted (ADR-D003).
+CREATE OR REPLACE FUNCTION recruitment.set_audit_fields()
+RETURNS trigger AS $$
+BEGIN
+    NEW.updated_at := now();
+    NEW.version    := OLD.version + 1;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- job_post  (a position the company is hiring for)
+-- `is_published = false` is a draft (koncept), seen by staff only.
+--
+-- `recruiter_id` is the Entra object id (`oid`) of the staff member with the Recruiter role who is responsible
+-- for the hiring (zodpovedný za realizáciu náboru). Staff accounts live in Entra, not in this database, so it is
+-- a logical reference with no foreign key (ADR-D004); the application checks the role on write. `NULL` until a
+-- hiring manager assigns one.
+CREATE TABLE recruitment.job_post (
+    id               UUID         PRIMARY KEY DEFAULT uuidv7(),
+    title            TEXT         NOT NULL,
+    location         TEXT         NOT NULL,
+    department       TEXT         NOT NULL,
+    is_published     BOOLEAN      NOT NULL DEFAULT false,
+    open_positions   INTEGER      NOT NULL,
+    payment_type     TEXT         NOT NULL,  -- hourly / monthly wage
+    employment_type  TEXT         NOT NULL,  -- TPP, part-time, work agreements, ...
+    recruiter_id     UUID,                   -- Entra oid of the responsible recruiter; logical, no FK
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    created_by       UUID         NOT NULL,
+    updated_at       TIMESTAMPTZ,
+    updated_by       UUID,
+    version          SMALLINT     NOT NULL DEFAULT 1,
+    CONSTRAINT job_post_title_valid CHECK (btrim(title) <> ''),
+    CONSTRAINT job_post_location_valid CHECK (btrim(location) <> ''),
+    CONSTRAINT job_post_department_valid CHECK (btrim(department) <> ''),
+    CONSTRAINT job_post_open_positions_valid CHECK (open_positions > 0),
+    CONSTRAINT job_post_payment_type_valid CHECK (payment_type IN ('hourly', 'monthly')),
+    CONSTRAINT job_post_employment_type_valid CHECK (employment_type IN (
+        'full_time', 'part_time', 'fixed_term', 'work_performance_agreement', 'work_activity_agreement',
+        'student_work_agreement', 'self_employed'))
+);
+-- A recruiter's own job posts.
+CREATE INDEX idx_job_post_recruiter_id ON recruitment.job_post (recruiter_id);
+CREATE TRIGGER trg_job_post_set_audit
+    BEFORE UPDATE ON recruitment.job_post
+    FOR EACH ROW EXECUTE FUNCTION recruitment.set_audit_fields();
