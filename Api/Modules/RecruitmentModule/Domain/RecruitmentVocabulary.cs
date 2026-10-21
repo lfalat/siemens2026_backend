@@ -25,6 +25,9 @@ public static class PaymentTypes
 
     /// <summary>Monthly wage (<i>mesačná mzda</i>).</summary>
     public const string Monthly = "monthly";
+
+    /// <summary>Yearly wage (<i>ročná mzda</i>).</summary>
+    public const string Yearly = "yearly";
 }
 
 /// <summary>The form of employment a job post offers (<c>job_post.employment_type</c>).</summary>

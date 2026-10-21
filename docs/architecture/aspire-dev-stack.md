@@ -93,7 +93,7 @@ Staff sign-in is not wired into the API yet; until it is, every endpoint is anon
 
 PostgreSQL and Azurite have no data volume, so each run gets an empty database and empty blob storage. Data created in the previous run is gone. ClamAV's signatures are the only exception (§4).
 
-This is deliberate: every run starts from the same state, and the schema comes from `configs/postgres/init/01-create-db.sql` ([ADR-D002](../db/decision-log.md#adr-d002--the-schema-is-an-init-ddl-script-until-production)) rather than from whatever an earlier run left behind. The AppHost copies `configs/postgres/init/` into the container's `/docker-entrypoint-initdb.d`, and PostgreSQL runs the scripts in name order against `POSTGRES_DB` (`healthyhires`) when the empty data directory is initialised. Seed scripts go next to it as `02-…sql`.
+This is deliberate: every run starts from the same state, and the schema comes from `configs/postgres/init/01-create-db.sql` ([ADR-D002](../db/decision-log.md#adr-d002--the-schema-is-an-init-ddl-script-until-production)) rather than from whatever an earlier run left behind. The AppHost copies `configs/postgres/init/` into the container's `/docker-entrypoint-initdb.d`, and PostgreSQL runs the scripts in name order against `POSTGRES_DB` (`healthyhires`) when the empty data directory is initialised. `02-seed-data.sql` then loads development data: job posts for the public list (two pages, every employment and wage type) and two drafts, pointing at placeholder Entra ids rather than real staff. Further seed scripts go next to it as `03-…sql`. The test harness loads `01-create-db.sql` alone, so tests start from an empty schema.
 
 ### Adding a data volume
 

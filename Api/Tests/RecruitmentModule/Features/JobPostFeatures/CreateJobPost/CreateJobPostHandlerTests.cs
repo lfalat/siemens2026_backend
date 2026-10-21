@@ -89,6 +89,20 @@ public class CreateJobPostHandlerTests
         Assert.Equal(1, await db.JobPosts.CountAsync(ct));
     }
 
+    [Theory]
+    [InlineData(PaymentTypes.Hourly)]
+    [InlineData(PaymentTypes.Monthly)]
+    [InlineData(PaymentTypes.Yearly)]
+    public async Task Every_payment_type_satisfies_the_schema(string paymentType)
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using RecruitmentDbContext db = TestDb.NewRecruitmentContext();
+
+        CreateJobPostResponse response = await Handler(db).HandleAsync(Command with { PaymentType = paymentType }, ct);
+
+        Assert.Equal(paymentType, response.PaymentType);
+    }
+
     [Fact]
     public async Task The_largest_salary_fits_the_column()
     {

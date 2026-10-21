@@ -1,10 +1,20 @@
 import { Button, makeStyles } from '@fluentui/react-components'
 import { ArrowLeftRegular } from '@fluentui/react-icons'
-import { Link, useParams } from 'react-router'
-import { jobOffers } from './jobOffers.ts'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
+import { usePublishedJobPost } from '../../../features/recruitment/publicJobPosts.ts'
+import {
+  employmentTypeLabels,
+  formatSalary,
+} from '../../../features/recruitment/vocabulary.ts'
+import { ApiError } from '../../../shared/api/http.ts'
+import { problemMessage } from '../../../shared/api/problem.ts'
 
 const useStyles = makeStyles({
   main: {
+    // index.css centres every <main>'s children (`display: grid; place-items: center`), and browsers now apply
+    // justify-items to block layout too, so both are reset: this page is a left-aligned column.
+    display: 'block',
+    justifyItems: 'stretch',
     maxWidth: '900px',
     width: '100%',
     boxSizing: 'border-box',
@@ -26,6 +36,7 @@ const useStyles = makeStyles({
     margin: 0,
     color: '#1F2933',
     fontSize: 'clamp(32px, 5vw, 48px)',
+    lineHeight: 1.15,
   },
   summary: {
     display: 'grid',
@@ -55,6 +66,8 @@ const useStyles = makeStyles({
     margin: '0 0 32px',
     color: '#475569',
     lineHeight: 1.7,
+    // Keeps the paragraphs the hiring manager typed.
+    whiteSpace: 'pre-line',
   },
   details: {
     display: 'grid',
@@ -80,14 +93,28 @@ const useStyles = makeStyles({
 
 export function JobOfferDetailPage() {
   const styles = useStyles()
-  const { offerId } = useParams()
-  const offer = jobOffers.find((item) => item.id === offerId)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { offerId = '' } = useParams()
+  const { data: offer, error } = usePublishedJobPost(offerId)
+
+  // Back to the list as it was left (page, filter) when the visitor came from it; otherwise to its first page.
+  function back() {
+    if (location.key !== 'default') void navigate(-1)
+    else void navigate('/aktualne-pozicie')
+  }
 
   if (!offer) {
     return (
       <main className={styles.main}>
         <Link to="/aktualne-pozicie">Späť na pracovné pozície</Link>
-        <p className={styles.notFound}>Pracovná pozícia nebola nájdená.</p>
+        <p className={styles.notFound}>
+          {error instanceof ApiError && error.status === 404
+            ? 'Pracovná pozícia nebola nájdená.'
+            : error
+              ? problemMessage(error)
+              : 'Načítavam pracovnú pozíciu…'}
+        </p>
       </main>
     )
   }
@@ -95,11 +122,10 @@ export function JobOfferDetailPage() {
   return (
     <main className={styles.main}>
       <Button
-        as="a"
-        href="/aktualne-pozicie"
         appearance="subtle"
         className={styles.back}
         icon={<ArrowLeftRegular />}
+        onClick={back}
       >
         Späť na pracovné pozície
       </Button>
@@ -111,8 +137,10 @@ export function JobOfferDetailPage() {
             <span className={styles.value}>{offer.location}</span>
           </div>
           <div>
-            <span className={styles.label}>Typ úväzku</span>
-            <span className={styles.value}>{offer.employmentType}</span>
+            <span className={styles.label}>Typ pracovného pomeru</span>
+            <span className={styles.value}>
+              {employmentTypeLabels[offer.employmentType]}
+            </span>
           </div>
           <div>
             <span className={styles.label}>Oddelenie</span>
@@ -123,13 +151,11 @@ export function JobOfferDetailPage() {
         <p className={styles.description}>{offer.description}</p>
         <div className={styles.details}>
           <div>
-            <strong>Výška mzdy (EUR):</strong> {offer.salary}
+            <strong>Mzda:</strong>{' '}
+            {formatSalary(offer.salary, offer.paymentType)}
           </div>
           <div>
-            <strong>Frekvencia vyplácania:</strong> {offer.salaryFrequency}
-          </div>
-          <div>
-            <strong>Počet otvorených miest:</strong> {offer.openings}
+            <strong>Počet otvorených miest:</strong> {offer.openPositions}
           </div>
         </div>
         <Button appearance="primary">Mám záujem o túto pozíciu</Button>

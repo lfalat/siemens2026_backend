@@ -13,15 +13,17 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router'
 import {
-  employmentTypeLabels,
-  employmentTypes,
   jobPostFormSchema,
-  paymentTypeLabels,
-  paymentTypes,
   useCreateJobPost,
   useRecruiters,
   type JobPostForm,
 } from '../../../features/recruitment/jobPosts.ts'
+import {
+  employmentTypeLabels,
+  employmentTypes,
+  paymentTypeLabels,
+  paymentTypes,
+} from '../../../features/recruitment/vocabulary.ts'
 import {
   problemFieldErrors,
   problemMessage,
@@ -284,7 +286,9 @@ export function StaffJobsPage() {
             </Field>
             <Field
               className={styles.field}
-              label={<span className={styles.label}>Typ úväzku</span>}
+              label={
+                <span className={styles.label}>Typ pracovného pomeru</span>
+              }
               required
               {...fieldError('employmentType')}
             >
@@ -294,7 +298,7 @@ export function StaffJobsPage() {
                 {...register('employmentType')}
               >
                 <option value="" disabled>
-                  Vyberte typ úväzku
+                  Vyberte typ pracovného pomeru
                 </option>
                 {employmentTypes.map((type) => (
                   <option key={type} value={type}>
@@ -322,9 +326,7 @@ export function StaffJobsPage() {
             </Field>
             <Field
               className={styles.field}
-              label={
-                <span className={styles.label}>Frekvencia vyplácania</span>
-              }
+              label={<span className={styles.label}>Typ mzdy</span>}
               required
               {...fieldError('paymentType')}
             >
@@ -334,7 +336,7 @@ export function StaffJobsPage() {
                 {...register('paymentType')}
               >
                 <option value="" disabled>
-                  Vyberte frekvenciu
+                  Vyberte typ mzdy
                 </option>
                 {paymentTypes.map((type) => (
                   <option key={type} value={type}>

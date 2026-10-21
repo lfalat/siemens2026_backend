@@ -4,39 +4,7 @@ import { request } from '../../shared/api/http.ts'
 import { useCommand } from '../../shared/api/useCommand.ts'
 import { getAccessToken } from '../../shared/auth/staffAuth.ts'
 import { useStaffAuth } from '../../shared/auth/StaffAuthContext.ts'
-
-/** The forms of employment the API accepts; mirrors `EmploymentTypes` in RecruitmentVocabulary.cs. */
-export const employmentTypes = [
-  'full_time',
-  'part_time',
-  'fixed_term',
-  'work_performance_agreement',
-  'work_activity_agreement',
-  'student_work_agreement',
-  'self_employed',
-] as const
-
-export type EmploymentType = (typeof employmentTypes)[number]
-
-export const employmentTypeLabels: Record<EmploymentType, string> = {
-  full_time: 'Trvalý pracovný pomer (TPP)',
-  part_time: 'Skrátený úväzok',
-  fixed_term: 'Pracovný pomer na dobu určitú',
-  work_performance_agreement: 'Dohoda o vykonaní práce',
-  work_activity_agreement: 'Dohoda o pracovnej činnosti',
-  student_work_agreement: 'Dohoda o brigádnickej práci študentov',
-  self_employed: 'Živnosť',
-}
-
-/** How the wage is stated; mirrors `PaymentTypes` in RecruitmentVocabulary.cs. */
-export const paymentTypes = ['monthly', 'hourly'] as const
-
-export type PaymentType = (typeof paymentTypes)[number]
-
-export const paymentTypeLabels: Record<PaymentType, string> = {
-  monthly: 'Mesačná mzda',
-  hourly: 'Hodinová mzda',
-}
+import { employmentTypes, paymentTypes } from './vocabulary.ts'
 
 const required = 'Toto pole je povinné.'
 const text = z
@@ -57,8 +25,10 @@ export const jobPostFormSchema = z.object({
     .trim()
     .min(1, required)
     .max(10000, 'Text môže mať najviac 10000 znakov.'),
-  employmentType: z.enum(employmentTypes, { error: 'Vyberte typ úväzku.' }),
-  paymentType: z.enum(paymentTypes, { error: 'Vyberte frekvenciu.' }),
+  employmentType: z.enum(employmentTypes, {
+    error: 'Vyberte typ pracovného pomeru.',
+  }),
+  paymentType: z.enum(paymentTypes, { error: 'Vyberte typ mzdy.' }),
   openPositions: z
     .number({ error: positions })
     .int(positions)

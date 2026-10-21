@@ -18,7 +18,7 @@ public sealed class JobPost
 
     public int OpenPositions { get; set; }
 
-    /// <summary>The wage in EUR, per hour or per month as <see cref="PaymentType"/> says.</summary>
+    /// <summary>The wage in EUR, per hour, month or year as <see cref="PaymentType"/> says.</summary>
     public decimal Salary { get; set; }
 
     /// <summary>One of <see cref="PaymentTypes"/>.</summary>

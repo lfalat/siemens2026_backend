@@ -6,8 +6,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 // ── Database (ADR-006, ADR-A005) ─────────────────────────────────────────────
 // One database with a schema per module (ADR-A001). Port and credentials are fixed so a local client
 // (psql, DBeaver, Rider) connects with the same values on every run; they are development-only values.
-// No data volume: every run starts from configs/postgres/init/01-create-db.sql, which the container executes
-// once against POSTGRES_DB — the same database AddDatabase names below, so the schema lands where the API connects.
+// No data volume: every run starts from configs/postgres/init/ (01-create-db.sql, then the 02-seed-data.sql development
+// data), which the container executes once against POSTGRES_DB — the same database AddDatabase names below, so the schema lands where the API connects.
 var postgresUser = builder.AddParameter("postgres-username", "healthyhires");
 var postgresPassword = builder.AddParameter("postgres-password", "healthyhires-dev", secret: true);
 

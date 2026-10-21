@@ -27,16 +27,18 @@ public sealed record CreateJobPostRequest
     /// <example>2</example>
     public int OpenPositions { get; init; }
 
-    /// <summary>The wage in EUR, per hour or per month as <c>paymentType</c> says; at most 2 decimal places.</summary>
+    /// <summary>The wage in EUR, per hour, month or year as <c>paymentType</c> says; at most 2 decimal places.</summary>
     /// <example>1800.00</example>
     public decimal Salary { get; init; }
 
-    /// <summary>How the wage is stated: <c>hourly</c> (hodinová mzda) or <c>monthly</c> (mesačná mzda).</summary>
+    /// <summary>
+    /// How the wage is stated: <c>hourly</c> (hodinová mzda), <c>monthly</c> (mesačná mzda) or <c>yearly</c> (ročná mzda).
+    /// </summary>
     /// <example>monthly</example>
     public string PaymentType { get; init; } = string.Empty;
 
     /// <summary>
-    /// The form of employment: <c>full_time</c> (TPP), <c>part_time</c> (skrátený úväzok), <c>fixed_term</c> (na dobu
+    /// The form of employment (typ pracovného pomeru): <c>full_time</c> (TPP), <c>part_time</c> (skrátený úväzok), <c>fixed_term</c> (na dobu
     /// určitú), <c>work_performance_agreement</c> (dohoda o vykonaní práce), <c>work_activity_agreement</c> (dohoda o
     /// pracovnej činnosti), <c>student_work_agreement</c> (brigádnická dohoda) or <c>self_employed</c> (živnosť).
     /// </summary>

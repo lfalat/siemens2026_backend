@@ -38,7 +38,7 @@ public sealed record CreateJobPostCommand : ICommand
     [DecimalPrecision(10, 2)]
     public decimal Salary { get; init; }
 
-    [Required, AllowedValues(PaymentTypes.Hourly, PaymentTypes.Monthly)]
+    [Required, AllowedValues(PaymentTypes.Hourly, PaymentTypes.Monthly, PaymentTypes.Yearly)]
     public string PaymentType { get; init; } = string.Empty;
 
     [Required, AllowedValues(

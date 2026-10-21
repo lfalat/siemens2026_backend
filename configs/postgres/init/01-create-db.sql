@@ -102,8 +102,8 @@ CREATE TABLE recruitment.job_post (
     is_published     BOOLEAN        NOT NULL DEFAULT false,
     open_positions   INTEGER        NOT NULL,
     salary           NUMERIC(10, 2) NOT NULL,  -- EUR, per `payment_type`
-    payment_type     TEXT           NOT NULL,  -- hourly / monthly wage
-    employment_type  TEXT           NOT NULL,  -- TPP, part-time, work agreements, ...
+    payment_type     TEXT           NOT NULL,  -- hourly / monthly / yearly wage
+    employment_type  TEXT           NOT NULL,  -- typ pracovného pomeru: TPP, part-time, work agreements, ...
     recruiter_id     UUID           NOT NULL,  -- Entra oid of the responsible recruiter; logical, no FK
     created_at       TIMESTAMPTZ    NOT NULL DEFAULT now(),
     created_by       UUID           NOT NULL,
@@ -116,7 +116,7 @@ CREATE TABLE recruitment.job_post (
     CONSTRAINT job_post_description_valid CHECK (btrim(description) <> ''),
     CONSTRAINT job_post_open_positions_valid CHECK (open_positions > 0),
     CONSTRAINT job_post_salary_valid CHECK (salary > 0),
-    CONSTRAINT job_post_payment_type_valid CHECK (payment_type IN ('hourly', 'monthly')),
+    CONSTRAINT job_post_payment_type_valid CHECK (payment_type IN ('hourly', 'monthly', 'yearly')),
     CONSTRAINT job_post_employment_type_valid CHECK (employment_type IN (
         'full_time', 'part_time', 'fixed_term', 'work_performance_agreement', 'work_activity_agreement',
         'student_work_agreement', 'self_employed'))

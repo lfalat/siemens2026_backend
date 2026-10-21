@@ -38,9 +38,9 @@ so `scripts/azure/db-grant-identity.sh` creates it in Azure.
 | `description` | `TEXT` |  | NO |  | What the job is, as applicants read it |
 | `is_published` | `BOOLEAN` |  | NO | `false` | `false` = draft (*koncept*), `true` = visible to applicants |
 | `open_positions` | `INTEGER` |  | NO |  | How many people are hired for the position |
-| `salary` | `NUMERIC(10,2)` |  | NO |  | The wage in EUR, per hour or per month as `payment_type` says |
+| `salary` | `NUMERIC(10,2)` |  | NO |  | The wage in EUR, per hour, month or year as `payment_type` says |
 | `payment_type` | `TEXT` |  | NO |  | How the wage is stated — see CHECK |
-| `employment_type` | `TEXT` |  | NO |  | The form of employment (*typ úväzku*) — see CHECK |
+| `employment_type` | `TEXT` |  | NO |  | The form of employment (*typ pracovného pomeru*) — see CHECK |
 | `recruiter_id` | `UUID` | LFK | NO |  | Entra object id of the staff member with the `Recruiter` role responsible for the hiring (*zodpovedný za realizáciu náboru*), chosen by the hiring manager who creates the post |
 
 **Value sets**
@@ -49,6 +49,7 @@ so `scripts/azure/db-grant-identity.sh` creates it in Azure.
 | ------ | ----- | ------- |
 | `payment_type` | `hourly` | Hourly wage (*hodinová mzda*) |
 | `payment_type` | `monthly` | Monthly wage (*mesačná mzda*) |
+| `payment_type` | `yearly` | Yearly wage (*ročná mzda*) |
 | `employment_type` | `full_time` | Permanent full-time employment (*trvalý pracovný pomer, TPP*) |
 | `employment_type` | `part_time` | Part-time employment (*skrátený úväzok*) |
 | `employment_type` | `fixed_term` | Fixed-term employment (*pracovný pomer na dobu určitú*) |
@@ -75,7 +76,7 @@ The application's copies are `PaymentTypes` and `EmploymentTypes` in `Recruitmen
 | `job_post_description_valid` | CHECK | `btrim(description) <> ''` | No blank description |
 | `job_post_open_positions_valid` | CHECK | `open_positions > 0` | At least one position to fill |
 | `job_post_salary_valid` | CHECK | `salary > 0` | A wage is always offered |
-| `job_post_payment_type_valid` | CHECK | `payment_type IN ('hourly','monthly')` | Guards the value set |
+| `job_post_payment_type_valid` | CHECK | `payment_type IN ('hourly','monthly','yearly')` | Guards the value set |
 | `job_post_employment_type_valid` | CHECK | `employment_type IN ('full_time','part_time','fixed_term','work_performance_agreement','work_activity_agreement','student_work_agreement','self_employed')` | Guards the value set |
 
 **Indexes**
@@ -99,5 +100,10 @@ The application's copies are `PaymentTypes` and `EmploymentTypes` in `Recruitmen
 - **Lengths are the application's.** The command caps `title`, `location` and `department` at 200 characters,
   `description` at 10 000 and `open_positions` at 1000; the table only guards what must never be stored (blank
   text, no positions, no wage). `salary` fits `NUMERIC(10,2)`: at most 99 999 999.99, with 2 decimal places.
-- **No title search index yet.** The [search-index convention](../conventions.md#search-indexes) calls for a trigram
-  GIN index on a searched title; it is added with the first feature that searches job posts.
+- **Public reads see published rows only.** `GET /job-posts` (offset pages, newest first by `created_at`, then `id`)
+  and `GET /job-posts/{id}` are anonymous and filter on `is_published`; a draft answers `404` like a missing post.
+  They never return `recruiter_id` or the audit columns.
+- **No search index yet — a deviation.** The public list searches `title` and `location` with `ILIKE '%…%'`. The
+  [search-index convention](../conventions.md#search-indexes) calls for a trigram GIN index, but that needs the
+  `pg_trgm` extension allow-listed on the Azure server, and one company's job posts are few enough to scan. Add it
+  when the table grows or the plan shows the scan costing.
