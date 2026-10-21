@@ -20,17 +20,17 @@ it and every instance sees the same one ([ADR-A016](../../architecture/ADR-ASPNE
 | --- | --- |
 | First request with a key | Runs normally; a **successful (2xx)** response is remembered. |
 | Repeat with the same key + same payload | The remembered response is **replayed byte-for-byte**, with an `Idempotency-Replayed: true` header. The endpoint does not run again. |
-| Repeat while the first claim has a live lease | `409 Conflict`, `idempotency.in_progress`. The claim is still held, which also happens when capturing the response failed. |
-| Same retained key, **different** payload | `422 Unprocessable Entity`, `idempotency.payload_mismatch`; see [Claim lifecycle](#claim-lifecycle) for expiry rules. |
-| `POST`/`PATCH` with **no** key header | `400 Bad Request`, `idempotency.key_missing` (configurable, see below). |
+| Repeat while the first claim has a live lease | `409 Conflict`. The claim is still held, which also happens when capturing the response failed. |
+| Same retained key, **different** payload | `422 Unprocessable Entity`; see [Claim lifecycle](#claim-lifecycle) for expiry rules. |
+| `POST`/`PATCH` with **no** key header | `400 Bad Request` (configurable, see below). |
 | Non-success response (4xx/5xx) | **Not** remembered; a later retry re-runs the endpoint. |
 | Successful response above the size cap | Sent to the client, **not** remembered; a later retry re-runs the endpoint. |
-| Key longer than the length limit | `400 Bad Request`, `idempotency.key_too_long`, before the store is touched. |
+| Key longer than the length limit | `400 Bad Request`, before the store is touched. |
 | `GET`/`PUT`/`DELETE`, or an opted-out endpoint | Passes straight through, untouched. |
 | `POST`/`PATCH` to a path that does not accept it | Passes straight through to the `405`, which does not mention the missing key. |
 
-The middleware's own rejections are ProblemDetails responses carrying the code in a `code` extension
-(`Kernel.Errors.CommonErrors`), like every other error ([errors.md](../errors/errors.md)).
+The middleware's own rejections are ProblemDetails responses with a Slovak `detail`, like every other error
+([errors.md](../errors/errors.md)).
 
 Keys are scoped **per signed-in user and per method + path**, so the same key value used by two staff
 users, or on two different endpoints, never collides. The user is the token's subject, the same identity

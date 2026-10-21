@@ -458,27 +458,28 @@ Dates & Owner:
 
 ---
 
-## ADR-A017: Error Codes — a Typed Catalog, Declared per Endpoint, Generated into OpenAPI
+## ADR-A017: Error Messages — Slovak Detail Written by the API
 
 Status: Accepted
 
 Context:
 
-- The frontend translates API errors into SK, CZ and EN ([ADR-F011](ADR-FRONTEND.md#adr-f011-localization--react-i18next-for-sk-cz-and-en)), but `detail` is English and includes ids, so it can't be a translation key.
+- The frontend is Slovak only ([ADR-F011](ADR-FRONTEND.md#adr-f011-localization--slovak-only)), so a code it translates on would only be mapped back to one Slovak string.
 
 Decision:
 
-- Every problem response carries a stable `code` from a typed catalog (`ErrorCode`, `FieldErrorCode` in `Kernel.Errors`); handlers throw `Kernel.Exceptions`, endpoints declare their codes with `ProducesErrors`, and the OpenAPI document lists them ([errors.md](../api/errors/errors.md)).
+- Every problem's `detail`, and each message under a validation problem's `errors`, is a Slovak message the frontend shows as is; handlers throw `Kernel.Exceptions` with it, and defaults live in `ErrorMessages` ([errors.md](../api/errors/errors.md)).
 
 Consequences:
 
-- Clients translate on `code` and can generate their translation keys from the document.
-- Codes are part of the API contract; renaming one after the first release is a breaking change.
-- Command validation answers per-field codes; the framework's parameter validation answers `request.validation_failed` without them.
+- Adding an error needs no catalog, declaration or frontend translation.
+- Wording is part of the API and is reviewed with the backend change.
+- The framework's parameter validation still answers English `errors`.
+- Another language later would mean localizing in the API, by `Accept-Language`.
 
 Dates & Owner:
 
-- Decided: 13. 10. 2026
+- Decided: 21. 10. 2026
 - Owner: Marek Dvorsky
 
 ---

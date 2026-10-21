@@ -15,7 +15,7 @@ Source of truth for this document:
 
 Cross-cutting concerns have their own guides; this document links to them instead of repeating them:
 
-- [Error Model](errors/errors.md): problem responses, the exception taxonomy, error codes and their catalogs.
+- [Error Model](errors/errors.md): problem responses, the exception taxonomy and the Slovak messages the frontend shows.
 - [Idempotency](idempotency/idempotency.md): at-most-once `POST`/`PATCH` through the `Idempotency-Key` header, applied by host middleware.
 - [Scheduling](scheduling/scheduling.md): daily and periodic background workers.
 - [Database conventions](../db/conventions.md): naming, keys, audit columns, the outbox table.
@@ -67,7 +67,7 @@ Api/
 │  │  ├─ CQRS/            ICommand, ICommandHandler, IQueryHandler + registration.
 │  │  ├─ Decorators/      EventScopeDecorator, ValidationDecorator.
 │  │  ├─ Endpoints/       IEndpoint, MapEndpoints, RequiresHeader, ProducesLink.
-│  │  ├─ Errors/          ErrorCode, FieldErrorCode, CommonErrors, ProducesErrors.
+│  │  ├─ Errors/          ErrorMessages, ValidationMessages: the Slovak error messages.
 │  │  ├─ Events/          EventScope, the ambient feature event name.
 │  │  ├─ Exceptions/      The exceptions that map to HTTP status codes.
 │  │  ├─ Idempotency/     The Idempotency-Key middleware, MapQuery.
@@ -81,7 +81,7 @@ Api/
 `Program.cs` composes them: every module exposes `Add<Name>Module()` to register its services and `Map<Name>Module()` to map its endpoints, and the host calls each. The ordering rules:
 
 - Every `Add<Name>Module()` call comes first. **`AddCqrsDecorators()` runs once, after all of them**, so every command handler is wrapped exactly once. A handler registered after it is not decorated.
-- The module endpoints are mapped on the versioned `/api/v{version}` group, which already carries the version set, the per-caller rate limit and `CommonErrors.AnyEndpoint`.
+- The module endpoints are mapped on the versioned `/api/v{version}` group, which already carries the version set, the per-caller rate limit and its `400` and `429` problem responses.
 
 ## 3. Anatomy of a module
 
@@ -97,8 +97,7 @@ RecruitmentModule/
 │  │  └─ Application.cs
 │  ├─ EntityTypeConfiguration/            One IEntityTypeConfiguration<T> per entity.
 │  │  └─ JobOfferConfiguration.cs
-│  ├─ RecruitmentVocabulary.cs            Constants and string-value sets.
-│  └─ RecruitmentErrors.cs                The module's error-code catalog.
+│  └─ RecruitmentVocabulary.cs            Constants and string-value sets.
 │
 ├─ Features/                              What the module DOES — the vertical slices.
 │  └─ JobOfferFeatures/
@@ -141,8 +140,7 @@ A module is a class library under `Api/Modules/<Name>Module` plus a database sch
 
 **2. Add the `Domain`.** Entities under `Domain/Entity/`, an `IEntityTypeConfiguration<T>` per entity under `Domain/EntityTypeConfiguration/`, and at the `Domain` root:
 
-- `<Name>Vocabulary.cs`, starting with `ModuleTypes.ModuleName`;
-- `<Name>Errors.cs`, the module's error-code catalog ([errors.md § Typed catalogs](errors/errors.md#typed-catalogs)). Add it to the catalog list in `ErrorCodeCatalogTests`.
+- `<Name>Vocabulary.cs`, starting with `ModuleTypes.ModuleName`.
 
 **3. Add the `DbContext`** under `Infrastructure/`:
 
@@ -209,7 +207,7 @@ A feature is **one folder**, `Features/<Area>/<Feature>/`, holding three files.
 - The **command** implements `ICommand` and names its feature event: `public static string EventName => ModuleEvents.JobOfferCreated;`, a lower `snake_case`, past-tense constant from the vocabulary, with no module prefix. The compiler requires it. While the command runs, the name is ambient ([§7](#7-the-decorator-chain)), so the audit trail and other modules can tell *which feature* made a change.
 - The command carries the **validation**, as DataAnnotations attributes ([§6](#6-validation)). Queries are not validated.
 - The **handler** implements `ICommandHandler<TCommand, TResult>`, the void `ICommandHandler<TCommand>`, or `IQueryHandler<TQuery, TResult>`. It takes its `DbContext` and services through the primary constructor and works against the `DbContext` directly.
-- It **signals failure by throwing** a `Kernel.Exceptions` type: `NotFoundException` → 404, `ConflictException` → 409, `ValidationException` → 400, and so on. A specific reason gets a code from the module's catalog: `new ConflictException(…) { Code = RecruitmentErrors.OfferClosed }`. Add a new code to the catalog first; a string is not accepted ([errors.md § Error codes](errors/errors.md#error-codes)).
+- It **signals failure by throwing** a `Kernel.Exceptions` type: `NotFoundException` → 404, `ConflictException` → 409, `ValidationException` → 400, and so on. The message is the Slovak `detail` the frontend shows the user as is; each type has a default, and a specific reason passes its own: `new ConflictException("Na túto ponuku sa už nedá prihlásiť, pretože je uzavretá.")` ([errors.md § Messages](errors/errors.md#messages)).
 
 **`<Feature>Endpoint.cs`**: an `internal sealed class` implementing `IEndpoint`. Its `MapEndpoint(IEndpointRouteBuilder group)` maps the route, builds the command from the request and route values **by hand** ([ADR-A012](../architecture/ADR-ASPNET.md#adr-a012-dto-mapping--manual-mapping)), dispatches it through the injected handler and returns the result. Nothing in the module root changes: the `MapEndpoints` scan finds it.
 
@@ -235,8 +233,8 @@ internal sealed class CreateJobOfferHandler(RecruitmentDbContext db)
     {
         // A rule spanning two fields: attributes cannot say it, so the handler does.
         if (command.SalaryMin > command.SalaryMax)
-            throw ValidationException.ForField(nameof(command.SalaryMin), RecruitmentErrors.SalaryRangeInverted,
-                "The minimum salary is above the maximum.");
+            throw ValidationException.ForField(nameof(command.SalaryMin),
+                "Minimálny plat nemôže byť vyšší ako maximálny.");
 
         JobOffer offer = new() { Id = Guid.CreateVersion7(), Title = command.Title };
         db.JobOffers.Add(offer);
@@ -266,8 +264,7 @@ internal sealed class CreateJobOfferEndpoint : IEndpoint
                 return Results.Created($"/job-offers/{result.Id}", result);
             })
             .WithName("CreateJobOffer")
-            .Produces<CreateJobOfferResponse>(StatusCodes.Status201Created)
-            .ProducesErrors(RecruitmentErrors.SalaryRangeInverted);
+            .Produces<CreateJobOfferResponse>(StatusCodes.Status201Created);
 }
 ```
 
@@ -275,8 +272,8 @@ internal sealed class CreateJobOfferEndpoint : IEndpoint
 
 - **Take ids from the route**, never from the body. The route is authoritative.
 - **Give every endpoint a name** with `.WithName(...)`. It becomes the `operationId`, which is what a link targets.
-- **Declare the success response** with `.Produces<T>()`, and **every error code** the handler and the services it calls can answer with `.ProducesErrors(...)`, which also declares each code's status. The rule codes of the command's attributes, `concurrency.conflict` on a write, and the idempotency rejections are added for you ([errors.md § Declaring what an endpoint answers](errors/errors.md#declaring-what-an-endpoint-answers)).
-- **Declare the statuses no handler raises:** a route with a path parameter can answer `404` (the id may name nothing), so declare `CommonErrors.NotFound` even when the handler never throws it. A body or a query parameter can answer `400`, which the versioned group already declares through `request.malformed`.
+- **Declare the success response** with `.Produces<T>()`, and **every error status** the handler and the services it calls can answer with `.ProducesProblem(status)`. The `400` of the command's rules, the `409` of a write, a policy's `403` and the idempotency rejections are added for you ([errors.md § Declaring error responses](errors/errors.md#declaring-error-responses)).
+- **Declare the statuses no handler raises:** a route with a path parameter can answer `404` (the id may name nothing), so declare it even when the handler never throws it. A body or a query parameter can answer `400`, which the versioned group already declares.
 - **A read that needs a request body** is mapped with `MapQuery`, not `MapPost`, and dispatches an `IQueryHandler` ([idempotency.md § Reads exposed as POST](idempotency/idempotency.md#reads-exposed-as-post)).
 - **Handlers and endpoints are `internal`.** The scans find non-public types, so nothing outside the module can call one directly ([ADR-A001](../architecture/ADR-ASPNET.md#adr-a001-application-architecture--modular-monolith)).
 - **Log through `[LoggerMessage]`** only, with an event id from the module's range, and mark every argument carrying applicant data `[PersonalData]` or `[SensitiveData]`. A direct `LogX` call or an interpolated template is a build error ([development-architecture.md §1.1](../architecture/development-architecture.md#11-backend-api)).
@@ -316,7 +313,7 @@ group.MapGet("/job-offers/{jobOfferId:guid}/applications", (
     [Range(1, 100)] int? pageSize, …) => …);
 ```
 
-`ParameterValidationTransformer` copies those rules onto the parameters, using the same rules as the request body. Such a failure is answered `request.validation_failed` without per-field codes. Keep rules on the command where you can, and on a parameter only when the value never reaches one.
+`ParameterValidationTransformer` copies those rules onto the parameters, using the same rules as the request body. Such a failure is answered with the framework's English messages under `errors`, not the Slovak ones. Keep rules on the command where you can, and on a parameter only when the value never reaches one.
 
 ### 5.3 Declaring a required header
 
@@ -332,7 +329,7 @@ group.RequiresHeader("X-Client-Instance", "Identifies the browser tab the draft 
 
 A command's rules are plain DataAnnotations attributes on its properties: `[Required]`, `[StringLength]`, `[Range]`, `[AllowedValues]`, and the Kernel's `[NotEmpty]` and `[DecimalPrecision]`.
 
-When an attribute fails, `ValidationDecorator` throws a `ValidationException` (`400`) carrying the English message and the attribute's code under `errorCodes` ([errors.md § Validation errors](errors/errors.md#validation-errors)). A failing `[Required]` short-circuits that property's other rules, so a missing value reports `required` and nothing else. Class-level attributes and `IValidatableObject` are not consulted; a rule spanning several fields belongs in the handler, or in `Infrastructure/Validation/` when it needs the database.
+When an attribute fails, `ValidationDecorator` throws a `ValidationException` (`400`) carrying the rule's Slovak message under `errors` ([errors.md § Validation messages](errors/errors.md#validation-messages)). The built-in attributes are worded for you; set `ErrorMessage` in Slovak where the generic wording says too little, as a `[RegularExpression]` usually does. A failing `[Required]` short-circuits that property's other rules, so a missing value reports only that it is required. Class-level attributes and `IValidatableObject` are not consulted; a rule spanning several fields belongs in the handler, or in `Infrastructure/Validation/` when it needs the database.
 
 The attributes live on the command, but the OpenAPI document describes the request DTO the endpoint binds. **`CommandValidationSchemaTransformer` joins the two by name**: it copies each rule from `<Feature>Command` or `<Feature>Query` onto the matching property of `<Feature>Request`, provided both are in the same namespace. Properties are matched by name, ignoring case.
 
@@ -392,13 +389,13 @@ If two modules need a small piece of *shared vocabulary* — a contract type, a 
 
 Full detail in [iam.md](../architecture/iam.md). There are two kinds of caller:
 
-- **Staff** sign in with Entra ID and send a bearer token. Their app role (`Recruiter`, `HiringManager` or `Admin`) arrives in the `roles` claim, and their `oid` identifies them in the database, e.g. as `created_by`. An endpoint declares what it needs with `.RequireAuthorization(...)`, and `auth.forbidden` is declared for it by rule. A validated token already proves the user exists, so **never re-query whether the acting user exists**.
-- **Applicants** are anonymous. Their endpoints are protected by ALTCHA, the per-IP rate limit and short-lived SAS URLs, not by identity, and never answer `auth.unauthenticated`.
+- **Staff** sign in with Entra ID and send a bearer token. Their app role (`Recruiter`, `HiringManager` or `Admin`) arrives in the `roles` claim, and their `oid` identifies them in the database, e.g. as `created_by`. An endpoint declares what it needs with `.RequireAuthorization(...)`, and its `403` is declared by rule. A validated token already proves the user exists, so **never re-query whether the acting user exists**.
+- **Applicants** are anonymous. Their endpoints are protected by ALTCHA, the per-IP rate limit and short-lived SAS URLs, not by identity, and never answer `401`.
 
 In practice, using `Kernel.Auth`:
 
 ```csharp
-RouteGroupBuilder staff = api.MapGroup("/recruitment").RequireStaff();   // any staff role; declares auth.unauthenticated
+RouteGroupBuilder staff = api.MapGroup("/recruitment").RequireStaff();   // any staff role; declares the 401
 staff.MapDelete("/job-offers/{id:guid}", Handler)
      .RequireAuthorization(StaffPolicies.Recruiter);                       // narrows the group to Recruiter and Admin
 
@@ -415,7 +412,7 @@ static Task<IResult> Handler(Guid id, ClaimsPrincipal user, ...) =>
 - **Manual DTO mapping** ([ADR-A012](../architecture/ADR-ASPNET.md#adr-a012-dto-mapping--manual-mapping)). No AutoMapper.
 - **Validation lives on the command** as DataAnnotations; the decorator enforces it, and the request schema copies it. Queries aren't validated.
 - **Every command names its event** with a `ModuleEvents` constant: lower `snake_case`, past tense, no module prefix.
-- **Codes come from a catalog**, never a string, and every reachable one is declared with `.ProducesErrors(...)`.
+- **Error messages are Slovak**, written for the user, and every reachable status is declared with `.ProducesProblem(...)`.
 - **A response carrying an id another route takes declares `.ProducesLink(...)`**, filling every path parameter of the target and staying inside the module.
 - **Explicit types, not `var`**, including in tests. Anonymous-typed projections are the exception.
 - **`Domain/Entity` is database entities only; constants live in the `Domain`-root vocabulary; shared services live in `Infrastructure`.** There is no `Common` folder.
@@ -435,17 +432,17 @@ The Kernel tests that pin the CQRS and endpoint machinery:
 | Tests | What they pin |
 | --- | --- |
 | `CqrsRegistrationTests` | The Scrutor scan registers each handler shape, `internal` ones included, as scoped. Command handlers are wrapped once, with the event scope outside validation. Queries are left alone. Decorating with nothing registered is a no-op. |
-| `ValidationDecoratorTests` | An invalid command never reaches its handler and carries a code per failure; `required` reports alone; the void form validates too |
+| `ValidationDecoratorTests` | An invalid command never reaches its handler and carries a Slovak message per failure; a missing value reports only that it is required; the void form validates too |
 | `CommandValidationSchemaTransformerTests` | Exclusive bounds, open upper bounds, enums, lengths and messages carry over from the command to the request schema |
 | `EndpointRegistrationTests` | Every `IEndpoint` in an assembly is mapped on the group, in type-name order |
 | `ResponseLinkTransformerTests` | A declared link reaches the document with its target and expressions, several links are named after their targets, and one on an undeclared status is skipped |
 | `RequiredHeaderTransformerTests` | A group's header reaches every endpoint in it, with its `400`, and nothing outside the group; a header already declared is not added twice |
 | `ParameterValidationTransformerTests` | Allowed values, ranges and lengths on route and query parameters reach the document, and a parameter without rules is untouched |
-| `ErrorCodeTransformerTests` | A dispatched command's rule codes are listed under the operation's `400` |
+| `ProblemResponseTransformerTests` | A dispatched command with rules declares the operation's `400`; a write its `409`; a policy its `403` |
 
 `StubHandler` and `StubVoidHandler` (`Tests/Shared/CQRS/`) stand in for an inner handler in a decorator test. `CommandValidation` (`Tests/Shared/Decorators/`) runs the decorator's validator on any object, for an attribute test.
 
-The first module also brings four tests that check every mapped endpoint — declared codes, declared statuses, `MapQuery` opt-outs and links ([first-module-tests.md](first-module-tests.md)).
+The first module also brings three tests that check every mapped endpoint — declared statuses, `MapQuery` opt-outs and links ([first-module-tests.md](first-module-tests.md)).
 
 ## 13. Checklists
 
@@ -454,18 +451,17 @@ The first module also brings four tests that check every mapped endpoint — dec
 - [ ] `Features/<Area>/<Feature>/` folder created.
 - [ ] `<Feature>Request.cs`: the wire contract with `<example>` docs, no validation attributes.
 - [ ] `<Feature>Handler.cs`: Command or Query (with DataAnnotations and `EventName` for a command), Response, `internal` Handler.
-- [ ] Handler uses the module `DbContext` directly and throws `Kernel.Exceptions` with codes from the module catalog.
-- [ ] `<Feature>Endpoint.cs`: `internal sealed class : IEndpoint`, manual mapping, ids from the route, `.WithName(...)`, `.Produces<T>()`, `.ProducesErrors(...)`, authorization on staff endpoints.
+- [ ] Handler uses the module `DbContext` directly and throws `Kernel.Exceptions` with Slovak messages for the user.
+- [ ] `<Feature>Endpoint.cs`: `internal sealed class : IEndpoint`, manual mapping, ids from the route, `.WithName(...)`, `.Produces<T>()`, `.ProducesProblem(...)`, authorization on staff endpoints.
 - [ ] `MapQuery` instead of `MapPost` for a read with a body.
 - [ ] `.ProducesLink(...)` if the response carries an id another operation takes in its route.
-- [ ] New error codes translated in the frontend's SK, CZ and EN files.
 - [ ] Tests under `Tests/<Name>Module/Features`, with seed data that satisfies the real schema.
 
 ### Add a module
 
 - [ ] Project `Api/Modules/<Name>Module` in both solutions, referencing `Shared/Kernel`, referenced by `ApiService`.
 - [ ] Schema and tables in `configs/postgres/init/01-create-db.sql`; documented in `docs/db/modules/`, schema version bumped, changelog entry.
-- [ ] `Domain/Entity`, `Domain/EntityTypeConfiguration`, `<Name>Vocabulary.cs` with `ModuleTypes.ModuleName`, `<Name>Errors.cs` added to `ErrorCodeCatalogTests`.
+- [ ] `Domain/Entity`, `Domain/EntityTypeConfiguration`, `<Name>Vocabulary.cs` with `ModuleTypes.ModuleName`.
 - [ ] `Infrastructure/<Name>DbContext.cs` with the module's default schema.
 - [ ] `<Name>Module.cs`: `Add<Name>Module` (pooled `DbContext` on the shared data source, `AddCqrsHandlers`) and `Map<Name>Module`.
 - [ ] `Program.cs`: `Add<Name>Module()` before `AddCqrsDecorators()`, `Map<Name>Module()` on the versioned group.

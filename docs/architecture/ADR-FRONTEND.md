@@ -266,27 +266,27 @@ Dates & Owner:
 
 ---
 
-## ADR-F011: Localization — react-i18next for SK, CZ and EN
+## ADR-F011: Localization — Slovak Only
 
 Status: Accepted
 
 Context:
 
-- The UI must be available in Slovak, Czech and English; strings appear in forms, validation messages and notifications.
+- The UI is used by a Slovak company and its Slovak applicants; strings appear in forms, validation messages and notifications.
 
 Decision:
 
-- Use `react-i18next` with one JSON resource file per language and feature.
-- No user-visible string is hard-coded in components.
+- The UI is Slovak only, with no translation layer.
 
 Consequences:
 
-- New screens add their strings to all three languages as part of the definition of done.
-- API error codes are translated in the frontend rather than displaying server messages directly.
+- Strings are written in Slovak where they are used.
+- API errors are shown as the Slovak `detail` and `errors` the API writes ([ADR-A017](ADR-ASPNET.md#adr-a017-error-messages--slovak-detail-written-by-the-api)).
+- Adding a language later means introducing a translation layer then.
 
 Dates & Owner:
 
-- Decided: 11. 10. 2026
+- Decided: 21. 10. 2026
 - Owner: Marek Dvorsky
 
 ---
