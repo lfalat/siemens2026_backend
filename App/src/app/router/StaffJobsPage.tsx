@@ -47,6 +47,12 @@ const useStyles = makeStyles({
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: '20px',
   },
+  salaryRow: {
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  },
+  openingsRow: {
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  },
   field: {
     display: 'grid',
     gap: '8px',
@@ -152,18 +158,33 @@ export function StaffJobsPage() {
                 <option value="contract">Dohoda</option>
               </Select>
             </Field>
+          </div>
+          <div className={`${styles.row} ${styles.salaryRow}`}>
             <Field
               className={styles.field}
-              label={<span className={styles.label}>Mzda</span>}
+              label={<span className={styles.label}>Výška mzdy</span>}
               required
             >
-              <Input
-                className={styles.input}
-                placeholder="Napr. 1800 EUR/mes."
-              />
+              <Input className={styles.input} placeholder="Napr. 1800 EUR" />
+            </Field>
+            <Field
+              className={styles.field}
+              label={
+                <span className={styles.label}>Frekvencia vyplácania</span>
+              }
+              required
+            >
+              <Select className={styles.input} defaultValue="">
+                <option value="" disabled>
+                  Vyberte frekvenciu
+                </option>
+                <option value="year">Rok</option>
+                <option value="month">Mesiac</option>
+                <option value="hour">Hodina</option>
+              </Select>
             </Field>
           </div>
-          <div className={styles.row}>
+          <div className={`${styles.row} ${styles.openingsRow}`}>
             <Field
               className={styles.field}
               label={
@@ -180,12 +201,12 @@ export function StaffJobsPage() {
             </Field>
             <Field
               className={styles.field}
-              label={<span className={styles.label}>Hiring manager</span>}
+              label={<span className={styles.label}>Recruiter</span>}
               required
             >
               <Select className={styles.input} defaultValue="">
                 <option value="" disabled>
-                  Vyberte manažéra
+                  Vyberte rekrútera
                 </option>
               </Select>
             </Field>
